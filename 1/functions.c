@@ -173,10 +173,10 @@ double** init(hashtable* ht, point *data , int no_samples, int no_dimensions, in
 
 }
 
-void euclidean_lsh_query(point* data, point* query_data, hashtable* hts, int no_queries, int no_samples, int no_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
+void euclidean_lsh_query(point* data, point* query_data, char * output, hashtable* hts, int no_queries, int no_samples, int no_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
 	int i, j;
 	FILE * o;
-	o = fopen("output/euclidean.txt", "w");
+	o = fopen(output, "w");
 	for(j = 0; j < no_queries; j++){
 		/* L S H */
 		clock_t start, end;
@@ -237,10 +237,10 @@ void euclidean_lsh_query(point* data, point* query_data, hashtable* hts, int no_
 	}
 }
 
-void cosine_query(point* data, point* query_data, hashtable* hts, int no_queries, int no_samples, int no_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
+void cosine_query(point* data, point* query_data, char * output, hashtable* hts, int no_queries, int no_samples, int no_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
 	int i, j;
 	FILE * o;
-	o = fopen("output/cosine.txt", "w");
+	o = fopen(output, "w");
 	for(j = 0; j < no_queries; j++){
 		/*C o s i n e */
 		clock_t start, end;
@@ -301,10 +301,10 @@ void cosine_query(point* data, point* query_data, hashtable* hts, int no_queries
 	}
 }
 
-void hypercube_query(point* data, point* query_data, hashtable hypercube , int no_queries, int no_samples, int no_dimensions, double radius, int no_of_functions, int table_size, int probes, int max, double** random_vectors){
+void hypercube_query(point* data, point* query_data, char * output, hashtable hypercube , int no_queries, int no_samples, int no_dimensions, double radius, int no_of_functions, int table_size, int probes, int max, double** random_vectors){
 	int i, j;
 	FILE * o;
-	o = fopen("output/hypercube.txt", "w");
+	o = fopen(output, "w");
 	for(j = 0; j < no_queries; j++){
 		/* L S H */
 		clock_t start, end;

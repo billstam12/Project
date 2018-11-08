@@ -12,13 +12,13 @@ int main(int argc, char** argv){
 	int i, j;
 	int probes;
 	int max = 10;
-	int no_of_functions = 0;
+	int no_of_functions = 1;
 
 	point * data;
 	point * query_data;
 	FILE *f;
 	FILE *q;
-	
+	char out[50];
 	for(i = 0; i < argc;i++){
 		if(!strcmp(argv[i],"-d")){
 			f = fopen(argv[++i],"r");
@@ -34,6 +34,9 @@ int main(int argc, char** argv){
 		}
 		if(!strcmp(argv[i], "-probes")){
 			probes = atoi(argv[++i]);
+		}
+		if(!strcmp(argv[i], "-o")){
+			strcpy(out,argv[++i]);
 		}
 	}
 	int end = 0;
@@ -64,7 +67,7 @@ int main(int argc, char** argv){
 			index = cosine_hash(&data[i], no_dimensions, no_of_functions, table_size, hyperplanes);
 			hashtable_insert(&hypercube, data[i], index);
 		}
-		hypercube_query(data, query_data, hypercube, no_queries, no_samples, no_dimensions, radius, no_of_functions, table_size, probes, max, hyperplanes);
+		hypercube_query(data, query_data, out, hypercube, no_queries, no_samples, no_dimensions, radius, no_of_functions, table_size, probes, max, hyperplanes);
 		
 		/* Free Space */
 

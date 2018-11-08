@@ -18,7 +18,7 @@ int main(int argc, char** argv){
 	point * query_data;
 	FILE *f;
 	FILE *q;
-	
+	char out[50];
 	for(i = 0; i < argc;i++){
 		if(!strcmp(argv[i],"-d")){
 			f = fopen(argv[++i],"r");
@@ -31,6 +31,9 @@ int main(int argc, char** argv){
 		}
 		if(!strcmp(argv[i], "-L")){
 			L = atoi(argv[++i]);
+		}
+		if(!strcmp(argv[i], "-o")){
+			strcpy(out,argv[++i]);
 		}
 	}
 	int end=0;
@@ -71,7 +74,7 @@ int main(int argc, char** argv){
 			}
 
 			/* Now we will give the queries to our hashtables */	
-			euclidean_lsh_query(data,  query_data,  hts,  no_queries, no_samples, no_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
+			euclidean_lsh_query(data,  query_data, out, hts,  no_queries, no_samples, no_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
 		}
 		else{
 			table_size = pow(2,no_of_functions);
@@ -81,7 +84,7 @@ int main(int argc, char** argv){
 			for(i = 0; i < L; i++){
 				random_vectors[i] = init(&hts[i], data ,  no_samples,  no_dimensions, window,  no_of_functions, table_size, L, i, metric, &t[i], &r[i]);
 			}
-			cosine_query(data,  query_data,  hts,  no_queries, no_samples, no_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
+			cosine_query(data,  query_data, out, hts, no_queries, no_samples, no_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
 		
 		}
 		/* Free Space */
