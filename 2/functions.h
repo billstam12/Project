@@ -16,7 +16,7 @@ void print_coordinates(point , int );
 void print_coordinates_cent(centroid , int );
 double euclidean_distance(double * , double * , int );
 double cosine_similarity(double * , double * , int );
-centroid * init_centroids(int , point* , int , int );
+centroid * init_centroids(int , point* , int , int, int );
 void compute_cluster(centroid * , point * , int, int, int* );
 int check_convergence(centroid * , centroid* , int , int , int);
 void copy_centroids(centroid** , centroid *, int , int );

@@ -20,6 +20,7 @@ typedef struct point{
 	double * coordinates;
 	long long int ** g_functions;
 	int centroid_id;
+	double dist; //distance from centroids
 	struct point * next;
 } *point;
 

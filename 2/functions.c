@@ -71,9 +71,9 @@ double cosine_similarity(double * c1, double * c2, int no_dimensions){
 }
 
 
-centroid * init_centroids(int k, point* data, int no_of_samples, int type){
+centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimensions, int type){
 	centroid *centroids = (centroid*)malloc(k*sizeof(centroid));
-	int i;
+	int i,j,z;
 	if(type==0){
 		for(i = 0; i< k ; i++){
 			centroid new_centroid;
@@ -87,12 +87,47 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int type){
 	}
 	else{
 		int id = (int)sample_uniform(no_of_samples);
-		for(i = 0; i< no_of_samples; i++){
-			if(i)
-			dist = euclidean_distance(data[id]->coordinates, data[i]->coordinates)
-		}
+		int found_centers = 0; //calculate how many centers we have found
+		// Get first random centroid
+		centroid new_centroid;
+		new_centroid = (centroid)malloc(sizeof(struct centroid));
+		centroids[0] = new_centroid;
+		centroids[0]->count = 0;
+		centroids[0]->assigned_points = (point*)malloc(sizeof(point));
+		centroids[0]->coordinates = data[id]->coordinates;
+		found_centers = 1;
 
+		
+		//Compute Distances from each centroid
+		for(z = 0; z < k; z++){
+			double* freqs = (double*)malloc(sizeof(double)*no_of_samples);
+			for(j = 0; j < no_of_samples; j++){
+				double dist;
+				for(i = 0; i < found_centers; i++){
+					data[j]-> dist += euclidean_distance(centroids[i]->coordinates, data[j]->coordinates, no_of_dimensions);
+				}
+				freqs[j] = pow(data[j]->dist,2);
+			}
+			int max_freq = 0;
+			long int max_freq_id;
+			for(j = 0; j < no_of_samples; j++){
+				if(freqs[j]>max_freq){
+					max_freq = freqs[j];
+					max_freq_id = j;
+				}
+				data[j]-> dist = 0;
+			}
+			centroid new_centroid;
+			new_centroid = (centroid)malloc(sizeof(struct centroid));
+			centroids[z+1] = new_centroid;
+			centroids[z+1]->id = z+1;
+			centroids[z+1]->count = 0;
+			centroids[z+1]->assigned_points = (point*)malloc(sizeof(point));
+			centroids[z+1]->coordinates = data[max_freq_id]->coordinates;
+			found_centers++;
+		}
 	}
+	centroids[0]->id = 0;
 	return centroids;
 }
 
@@ -305,7 +340,7 @@ point * parse_data(FILE* f, int* no_samples, int* no_dimensions){
 		j = 0;		
 		line = strtok(line,delimit);
 		new_point-> id = atof(line);
-
+		new_point-> dist = 0.0;
 		while((line = strtok(NULL,delimit)) != NULL){		
 			new_point -> coordinates[j] = atof(line);
 			data[i] = new_point;

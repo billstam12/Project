@@ -39,10 +39,17 @@ int main(int argc, char** argv){
 
 	//Create centroids
 	centroid * centroids;
-	int type = 0; //0 random, 1 kmeans++
+	int type = 1; //0 random, 1 kmeans++
 
-	centroids = init_centroids(k, data, no_of_samples, type);
-
+	centroids = init_centroids(k, data, no_of_samples, no_of_dimensions, type);
+	
+	/*
+	for(i = 0; i < k; i++){
+		printf("ID= %ld\n", centroids[i]->id);		
+		printf("COUNT= %d\n",centroids[i]->count);
+		print_coordinates_cent(centroids[i],  no_of_dimensions);
+	}
+	*/
 	/* Compute the distance of each point from a centroid
 	and assign each point to a centroid and each centroid to 
 	the points it has */
