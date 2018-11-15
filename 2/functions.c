@@ -71,31 +71,43 @@ double cosine_similarity(double * c1, double * c2, int no_dimensions){
 }
 
 
-centroid * init_centroids(int k, int no_dimensions){
+centroid * init_centroids(int k, point* data, int no_of_samples, int type){
 	centroid *centroids = (centroid*)malloc(k*sizeof(centroid));
 	int i;
-	for(i = 0; i< k ; i++){
-		centroid new_centroid;
-		new_centroid = (centroid)malloc(sizeof(struct centroid));
-		centroids[i] = new_centroid;
-		centroids[i]->id = i;
-		centroids[i]->count = 0;
-		centroids[i]->assigned_points = (point*)malloc(sizeof(point));
-		centroids[i]->coordinates = create_random_vector(no_dimensions);
+	if(type==0){
+		for(i = 0; i< k ; i++){
+			centroid new_centroid;
+			new_centroid = (centroid)malloc(sizeof(struct centroid));
+			centroids[i] = new_centroid;
+			centroids[i]->id = i;
+			centroids[i]->count = 0;
+			centroids[i]->assigned_points = (point*)malloc(sizeof(point));
+			centroids[i]->coordinates = data[rand()%no_of_samples]->coordinates;
+		}
+	}
+	else{
+		int id = (int)sample_uniform(no_of_samples);
+		for(i = 0; i< no_of_samples; i++){
+			if(i)
+			dist = euclidean_distance(data[id]->coordinates, data[i]->coordinates)
+		}
+
 	}
 	return centroids;
 }
 
-cluster compute_cluster(centroid * centroids, point * data, int no_of_samples, int no_of_dimensions, int k){
-	int i,j;
+void compute_cluster(centroid * centroids, point * data, int no_of_samples, int no_of_dimensions, int* k){
+	int i,j,z;
 	double min;
 	long int id;
+
+	// Check where each point falls
 	for(i = 0; i < no_of_samples; i++){
 		min = euclidean_distance((centroids[0])->coordinates, (data[i])->coordinates, no_of_dimensions);
 		id = (centroids[0])->id;
 		double dist;
 
-		for(j = 1; j < k; j++){
+		for(j = 1; j < (*k); j++){
 			dist = euclidean_distance((centroids[j])->coordinates, (data[i])->coordinates, no_of_dimensions);
 			if(dist < min){
 				min = dist;
@@ -109,19 +121,133 @@ cluster compute_cluster(centroid * centroids, point * data, int no_of_samples, i
 			(centroids[id])->assigned_points[0] = data[i];
 		}
 		else{
-			centroids[id]->assigned_points = (point*)realloc(centroids[id]->assigned_points,(centroids[id]->count)*sizeof(point));
+			centroids[id]->assigned_points = (point*)realloc(centroids[id]->assigned_points,(centroids[id]->count)*sizeof(point));//Temporal
 			centroids[id]->assigned_points[(centroids[id]->count)-1] = data[i];
 		}
 		//printf("Point with ID:%ld was classified in %ld with distance %f\n",data[i]->id, id, dist);
 	}
+
+	// Compute cluster mean and find new centroid
+	for(i = 0; i < (*k); i++){
+		// If for some reason one cluster is empty, then remove it 
+		if(centroids[i]->count==0){
+			for(j=i;j<(*k);j++){
+				centroids[j] = centroids[j+1];
+			}
+			i -= 1;
+			*k -= 1;
+		}
+		else{
+			double * mean = (double*)malloc(sizeof(double)*no_of_dimensions);
+			for(j = 0; j < no_of_dimensions; j++){
+				mean[j] = 0;
+				for(z = 0; z < centroids[i]->count; z++){
+					mean[j] += centroids[i]->assigned_points[z]->coordinates[j];
+				}
+				mean[j] /= centroids[i]->count;
+			}
+			centroids[i]->coordinates = mean;
+		}
+		centroids[i] -> count = 0;
+	}
+
+	/*for(i = 0; i < k; i++){
+		for(j = 0; j < centroids[i]->count; j++){
+			printf("%ld ", centroids[i]->assigned_points[j]->id);
+		}
+		printf("\n");
+	}
+	
 	cluster cl;
 	cl = (cluster)malloc(sizeof(struct cluster));
-	cl->data = data;
-	cl->centroids = centroids;
 
+	cl->data = (point*)malloc(sizeof(point)*no_of_samples);
+	for( i =0; i< no_of_samples; i++){
+		copy_point(&(cl->data[i]),data[i], no_of_dimensions);
+	}
+	
+	cl->centroids = (centroid*)malloc(sizeof(centroid)*(*k));
+	for(i = 0; i < (*k); i++){
+		copy_centroid(&(cl->centroids[i]), centroids[i], no_of_dimensions);
+
+	}
 	return cl;	
+	*/
 }
 
+void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimensions,int k){
+	int converged = 0;
+	int bb = 1;
+	int i;
+	while(converged == 0){
+		// Save the centroids for later
+		int k_prev = k;
+		centroid * old_cent;
+		old_cent = (centroid*)malloc(sizeof(centroid)*k);
+		for( i = 0; i< k; i++){
+			old_cent[i] = (centroid)malloc(sizeof(struct centroid));
+			copy_centroid(&(old_cent[i]), centroids[i], no_of_dimensions );
+		}
+		compute_cluster(centroids, data, no_of_samples, no_of_dimensions, &k);
+		/*
+		for(i = 0; i < k; i++){
+			print_coordinates_cent(old_cent[i], no_of_dimensions);
+			print_coordinates_cent(centroids[i], no_of_dimensions);		
+			printf("\n");
+		}
+		*/
+		//Check for convergence
+		converged = check_convergence(old_cent, centroids, no_of_dimensions, k_prev, k);
+		
+
+		/*
+		data = cl->data;
+		*/	
+		//free(old_cent);
+		bb++;	
+	}
+}
+
+void copy_centroid(centroid* c1, centroid c2, int no_of_dimensions){
+	int i;
+	(*c1)->id = c2->id;
+	(*c1)->count = c2->count;
+	(*c1)->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
+	for(i = 0; i < no_of_dimensions; i++){
+		(*c1)->coordinates[i] = c2->coordinates[i];
+	}
+	(*c1)->assigned_points = (point*)malloc((*c1)->count*sizeof(point));
+	for(i = 0; i < (*c1)->count; i++){
+		copy_point(&((*c1)->assigned_points[i]), c2->assigned_points[i], no_of_dimensions);
+	}
+}
+
+void copy_point(point* p1, point p2, int no_of_dimensions){
+	int i;
+	(*p1)->id = p2->id;
+	(*p1)->centroid_id = p2->centroid_id;
+	printf("%ld\n", (*p1)->id);
+	(*p1)->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
+	for(i = 0; i < no_of_dimensions; i++){
+		(*p1)->coordinates[i] = p2->coordinates[i];
+	}
+}
+
+
+int check_convergence(centroid * c1, centroid* c2, int no_of_dimensions, int k_prev, int k){
+	int j = 0;
+	int b = 1;
+	int i = 0;
+	
+	for(i = 0;  i < k; i++){
+		for( j = 0; j < no_of_dimensions; j++){
+			if(c1[i]->coordinates[j] != c2[i]->coordinates[j]){
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
 
 point * parse_data(FILE* f, int* no_samples, int* no_dimensions){
 	rewind(f);

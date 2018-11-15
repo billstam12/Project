@@ -37,7 +37,6 @@ typedef struct cluster{
 } *cluster;
 
 
-
 typedef struct bucket{
 	point first, last;
 } *bucket;

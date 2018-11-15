@@ -9,7 +9,6 @@ int main(int argc, char** argv){
 	// Default values
 	int no_of_samples = 100;
 	int no_of_dim = 10;
-	int type = 0; //0 for dataset 1 for query
 	int i, j;
 	for(i = 0; i < argc;i++){
 		if(!strcmp(argv[i],"-n")){
@@ -17,9 +16,6 @@ int main(int argc, char** argv){
 		}
 		else if(!strcmp(argv[i], "-d")){
 			no_of_dim = atoi(argv[++i]);
-		}
-		else if(!strcmp(argv[i], "-t")){
-			type = atoi(argv[++i]);
 		}
 	}
 
@@ -44,7 +40,7 @@ int main(int argc, char** argv){
 		
 		
 	id = 0;
-		// Create dimension coordinates that are close to each other numerically
+	// Create dimension coordinates that are close to each other numerically
 	for(i=0;i < no_of_samples; i++){
 		for(j=0; j < no_of_dim-1; j++){
 			if(j == 0){

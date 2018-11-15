@@ -39,21 +39,13 @@ int main(int argc, char** argv){
 
 	//Create centroids
 	centroid * centroids;
-	centroids = init_centroids(k, no_of_dimensions);
+	int type = 0; //0 random, 1 kmeans++
+
+	centroids = init_centroids(k, data, no_of_samples, type);
 
 	/* Compute the distance of each point from a centroid
 	and assign each point to a centroid and each centroid to 
 	the points it has */
-	cluster cl;
-	cl = compute_cluster(centroids, data, no_of_samples, no_of_dimensions, k);
-	centroids = cl->centroids;
-	data = cl->data;
-	
-	for(i = 0; i < k; i++){
-		for(j = 0; j < centroids[i]->count; j++){
-			printf("%ld ", centroids[i]->assigned_points[j]->id);
-		}
-		printf("\n");
-	}
+	kmeans(centroids,data,no_of_samples,no_of_dimensions,k); //Loydds kmeans
 	
 }
