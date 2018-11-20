@@ -50,9 +50,13 @@ int main(int argc, char** argv){
 		print_coordinates_cent(centroids[i],  no_of_dimensions);
 	}
 	*/
+
 	/* Compute the distance of each point from a centroid
 	and assign each point to a centroid and each centroid to 
 	the points it has */
-	kmeans(centroids,data,no_of_samples,no_of_dimensions,k); //Loydds kmeans
+
+	type = 0; //0 normal, 1 PAM
+	int assignment = 1; //0 lloyds, 1 lsh, 2 hyperplane
+	kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric, type); 
 	
 }

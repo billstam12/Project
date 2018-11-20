@@ -21,12 +21,15 @@ typedef struct point{
 	long long int ** g_functions;
 	int centroid_id;
 	double dist; //distance from centroids
+	double dist_as_centroid;
 	struct point * next;
 } *point;
 
 typedef struct centroid{
 	long int id;
 	int count;
+	double dist;
+	long long int ** g_functions;
 	double * coordinates;
 	point* assigned_points;
 } *centroid;
