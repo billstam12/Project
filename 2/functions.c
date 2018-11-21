@@ -343,50 +343,7 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 	}
 }
 
-void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int *k){
-	int table_size = no_of_samples/12;
-	int L = 4;
-	int window = 30;
-	int no_of_functions = 40;
-	int i, j,z;
-	double radius;
-	/*Calculate radius */
-	double min_dist= euclidean_distance(centroids[0]->coordinates, centroids[1]->coordinates, no_of_dimensions);
-	for(i = 0; i < *k; i++){
-		for(j = i+1; j < *k; j++){
-			double dist = euclidean_distance(centroids[i]->coordinates, centroids[j]->coordinates, no_of_dimensions);
-			if( dist < min_dist){
-				min_dist = dist;
-			}
-		}
-	}
-	radius = min_dist /2;
-	//printf("%f\n",radius);
-	double ** t; // t array
-	t = (double**)malloc(L*sizeof(double*));
-	int ** r; // r array
-	r = (int**)malloc(L*sizeof(int*));
-	double *** random_vectors; // random hyperplane vectors
-	random_vectors = (double***)malloc(L*sizeof(double**));
-	hashtable * hts;
-	hts = (hashtable*)malloc(L * sizeof(hashtable));
 
-	if(metric == 0){
-		for(i = 0; i < L; i ++){
-			hashtable_init(&hts[i], table_size);
-		}
-		for(i=0;i<no_of_samples;i++){
-			data[i]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
-		}	
-		for(i = 0; i < L; i++){
-			random_vectors[i] = init(&hts[i], data ,  no_of_samples,  no_of_dimensions, window,  no_of_functions, table_size, L,  i, metric, &t[i], &r[i]);
-			hashtable_print(hts[i]);
-		}
-
-		/* Now we will give the queries to our hashtables */	
-		euclidean_lsh_query(data,  centroids, hts,  *k, no_of_samples, no_of_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
-	}
-}
 
 void *my_realloc(void *ptr, size_t originalLength, size_t newLength)
 {
@@ -478,6 +435,7 @@ void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k
 			}
 			i -= 1;
 			*k -= 1;
+			printf("Found empty centroid\n");
 		}
 		else{
 			double * mean = (double*)malloc(sizeof(double)*no_of_dimensions);
@@ -497,32 +455,42 @@ void pam(centroid *centroids, point* data, int no_of_dimensions, int *k){
 // Compute cluster cost function and find new centroid
 	int i,j,z ;
 	for(i = 0; i < (*k); i++){
+		centroids[i]->dist = 0.0;
+		for(j = 0; j < centroids[i]->count; j++){
+			centroids[i]->dist += centroids[i]->assigned_points[j]->dist;
+		}		
+	}
+	for(i = 0; i < (*k); i++){
+		double min_cost = centroids[i]->dist;
+		long int min_id = 0;
 		if(centroids[i]->count==0){
 			for(j=i;j<(*k);j++){
 				centroids[j] = centroids[j+1];
 			}
 			i -= 1;
 			*k -= 1;
+			printf("PAM found empty centroid\n");
 		}
-		double min_cost = centroids[i]->dist;
-		long int min_id;
-		for( j = 0; j < centroids[i]->count; j++){
-			centroids[i]->assigned_points[j]->dist_as_centroid = 0.0;
-			for( z = 0; z < centroids[i]->count; z++ ){
-				//Compute new cost
-				if(z!=j){
-					centroids[i]->assigned_points[j]->dist_as_centroid += euclidean_distance(centroids[i]->assigned_points[j]->coordinates, centroids[i]->assigned_points[z]->coordinates,no_of_dimensions);
+		else{
+			for( j = 0; j < centroids[i]->count; j++){
+				centroids[i]->assigned_points[j]->dist_as_centroid = 0.0;
+				for( z = 0; z < centroids[i]->count; z++ ){
+					//Compute new cost
+					if(z!=j){
+						centroids[i]->assigned_points[j]->dist_as_centroid += euclidean_distance(centroids[i]->assigned_points[j]->coordinates, centroids[i]->assigned_points[z]->coordinates,no_of_dimensions);
+					}
 				}
-			}
-			if(centroids[i]->assigned_points[j]->dist_as_centroid < min_cost){
-				min_id =  j;
-				min_cost = centroids[i]->assigned_points[j]->dist_as_centroid;
-			}
+				if(centroids[i]->assigned_points[j]->dist_as_centroid < min_cost){
+					min_id =  j;
+					min_cost = centroids[i]->assigned_points[j]->dist_as_centroid;
+				}
 
-		}
-		//Update centroid with the new one
-		for( j = 0; j< centroids[i]->count; j++){
-			centroids[i]->coordinates[j] = centroids[i]->assigned_points[min_id]->coordinates[j];
+			}
+			//Update centroid with the new one
+			//printf("%ld %f\n",min_id, min_cost);
+			for( j = 0; j< no_of_dimensions; j++){
+				centroids[i]->coordinates[j] = centroids[i]->assigned_points[min_id]->coordinates[j];
+			}
 		}
 	}
 }
@@ -537,13 +505,7 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 	else if(assignment == 1){
 		lsh_assignment(centroids, data, no_of_samples, no_of_dimensions, metric, k);
 	}
-	for(i = 0; i < (*k); i++){
-		centroids[i]->dist = 0.0;
-		for(j = 0; j < centroids[i]->count; j++){
-			centroids[i]->dist += centroids[i]->assigned_points[j]->dist;
-		}
-		
-	}
+	
 	if(type == 0){
 		basic_update(centroids, data, no_of_dimensions, k);
 	}
@@ -558,6 +520,7 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 	int i;
 	while(converged == 0){
 		// Save the centroids for later
+
 		for( i = 0; i< k;i++){
 			centroids[i] -> count = 0;
 		}
@@ -570,13 +533,11 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 		}
 		compute_cluster(centroids, data, no_of_samples, no_of_dimensions, &k, assignment, metric, type);
 		
-		
 		for(i = 0; i < k; i++){
 			print_coordinates_cent(old_cent[i], no_of_dimensions);
 			print_coordinates_cent(centroids[i], no_of_dimensions);		
 			printf("\n");
 		}
-		
 		
 		//Check for convergence
 		converged = check_convergence(old_cent, centroids, no_of_dimensions, k_prev, k);
@@ -599,6 +560,78 @@ int check_convergence(centroid * c1, centroid* c2, int no_of_dimensions, int k_p
 	}
 	return 1;
 }
+
+
+void shilouette_evaluation(centroid* centroids,point* data,int no_of_samples,int no_of_dimensions){
+	int i,j;
+	for(i = 0 ; i < no_of_samples; i++){
+		int a_id = data[i]->centroid_id;
+		int b_id = data[i]->centroid2_id;
+
+		long double a = 0;
+		long double b = 0;
+		for(j = 0; j < centroids[a_id]->count; j++){
+			a += euclidean_distance(data[i]->coordinates, centroids[a_id]->assigned_points[j]->coordinates, no_of_dimensions);
+		}
+		for(j = 0; j < centroids[b_id]->count; j++){
+			b += euclidean_distance(data[i]->coordinates, centroids[b_id]->assigned_points[j]->coordinates, no_of_dimensions);
+		}
+		double max;
+		if(a > b){
+			max = a;
+		}
+		else{ max = b;}
+		data[i]->silhouette= ((b-a)/max);
+	}
+}
+
+
+
+void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int *k){
+	int table_size = no_of_samples/12;
+	int L = 4;
+	int window = 30;
+	int no_of_functions = 40;
+	int i, j,z;
+	double radius;
+	/*Calculate radius */
+	double min_dist= euclidean_distance(centroids[0]->coordinates, centroids[1]->coordinates, no_of_dimensions);
+	for(i = 0; i < *k; i++){
+		for(j = i+1; j < *k; j++){
+			double dist = euclidean_distance(centroids[i]->coordinates, centroids[j]->coordinates, no_of_dimensions);
+			if( dist < min_dist){
+				min_dist = dist;
+			}
+		}
+	}
+	radius = min_dist /2;
+	//printf("%f\n",radius);
+	double ** t; // t array
+	t = (double**)malloc(L*sizeof(double*));
+	int ** r; // r array
+	r = (int**)malloc(L*sizeof(int*));
+	double *** random_vectors; // random hyperplane vectors
+	random_vectors = (double***)malloc(L*sizeof(double**));
+	hashtable * hts;
+	hts = (hashtable*)malloc(L * sizeof(hashtable));
+
+	if(metric == 0){
+		for(i = 0; i < L; i ++){
+			hashtable_init(&hts[i], table_size);
+		}
+		for(i=0;i<no_of_samples;i++){
+			data[i]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
+		}	
+		for(i = 0; i < L; i++){
+			random_vectors[i] = init(&hts[i], data ,  no_of_samples,  no_of_dimensions, window,  no_of_functions, table_size, L,  i, metric, &t[i], &r[i]);
+			hashtable_print(hts[i]);
+		}
+
+		/* Now we will give the queries to our hashtables */	
+		euclidean_lsh_query(data,  centroids, hts,  *k, no_of_samples, no_of_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
+	}
+}
+
 
 /* HASHTABLE FUNCTIONS */
 

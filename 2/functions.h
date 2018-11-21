@@ -36,3 +36,4 @@ int cosine_hash(point* , int , int , int , double** );
 long long int euclidean_hash(point*, int , int ,  int , int , int , double* , int *, double** );
 long long int euclidean_hash_centroid(centroid*, int , int ,  int , int , int , double* , int *, double** );
 int compare_gfuncs(long long int * , long long int * , int );
+void shilouette_evaluation(centroid* ,point* ,int ,int );

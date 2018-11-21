@@ -55,28 +55,11 @@ int main(int argc, char** argv){
 	and assign each point to a centroid and each centroid to 
 	the points it has */
 
-	type = 1; //0 normal, 1 PAM
-	int assignment = 0; //0 lloyds, 1 lsh, 2 hyperplane
+	type = 0; //0 normal, 1 PAM
+	int assignment = 1; //0 lloyds, 1 lsh, 2 hyperplane
 	kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric, type); 
 
 	//Evaluate centroids
-	for(i = 0 ; i < no_of_samples; i++){
-		int a_id = data[i]->centroid_id;
-		int b_id = data[i]->centroid2_id;
+	//shilouette_evaluation(centroids, data, no_of_samples, no_of_dimensions);
 
-		long double a = 0;
-		long double b = 0;
-		for(j = 0; j < centroids[a_id]->count; j++){
-			a += euclidean_distance(data[i]->coordinates, centroids[a_id]->assigned_points[j]->coordinates, no_of_dimensions);
-		}
-		for(j = 0; j < centroids[b_id]->count; j++){
-			b += euclidean_distance(data[i]->coordinates, centroids[b_id]->assigned_points[j]->coordinates, no_of_dimensions);
-		}
-		double max;
-		if(a > b){
-			max = a;
-		}
-		else{ max = b;}
-		data[i]->silhouette= ((b-a)/max);
-	}
 }
