@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h> 
+#include <assert.h>
 #include <time.h>
 #include "hashtable.h"
 
@@ -29,8 +30,9 @@ void pam(centroid *, point* , int , int *);
 void lloyds_assignment(centroid * , point* , int , int , int *);
 void lsh_assignment(centroid* , point* , int , int , int, int *);
 double** init(hashtable*, point * , int , int , int  , int , int , int, int, int, double ** ,  int ** );
-void euclidean_lsh_query(point* , centroid* , char * , hashtable* , int , int , int , int , double , int , int , int , double** , int** , double*** );
+void euclidean_lsh_query(point* , centroid* ,  hashtable* , int , int , int , int , double , int , int , int , double** , int** , double*** );
 void cosine_query(point* , point* , char*, hashtable* , int , int , int , int , double , int , int , int , double** , int** , double*** );
 int cosine_hash(point* , int , int , int , double** );
 long long int euclidean_hash(point*, int , int ,  int , int , int , double* , int *, double** );
 long long int euclidean_hash_centroid(centroid*, int , int ,  int , int , int , double* , int *, double** );
+int compare_gfuncs(long long int * , long long int * , int );

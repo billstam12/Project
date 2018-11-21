@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <math.h> 
 #include <time.h>
 
@@ -20,17 +21,21 @@ typedef struct point{
 	double * coordinates;
 	long long int ** g_functions;
 	int centroid_id;
+	int centroid2_id;
 	double dist; //distance from centroids
 	double dist_as_centroid;
 	struct point * next;
+	double silhouette;
 } *point;
 
 typedef struct centroid{
 	long int id;
 	int count;
+	int prev_count;
 	double dist;
 	long long int ** g_functions;
 	double * coordinates;
+	double silhouette_of_cluster;
 	point* assigned_points;
 } *centroid;
 
