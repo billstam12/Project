@@ -39,7 +39,7 @@ int main(int argc, char** argv){
 
 	//Create centroids
 	centroid * centroids;
-	int type = 1; //0 random, 1 kmeans++
+	int type = 0; //0 random, 1 kmeans++
 
 	centroids = init_centroids(k, data, no_of_samples, no_of_dimensions, type);
 	
@@ -57,8 +57,8 @@ int main(int argc, char** argv){
 
 	type = 0; //0 normal, 1 PAM
 	int assignment = 1; //0 lloyds, 1 lsh, 2 hyperplane
-	kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric, type); 
-
+	kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric,no_of_functions, L, type); 
+	
 	//Evaluate centroids
 	//shilouette_evaluation(centroids, data, no_of_samples, no_of_dimensions);
 
