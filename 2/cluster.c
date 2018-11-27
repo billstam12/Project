@@ -39,7 +39,7 @@ int main(int argc, char** argv){
 
 	//Create centroids
 	centroid * centroids;
-	int type = 0; //0 random, 1 kmeans++
+	int type = 1; //0 random, 1 kmeans++
 
 	centroids = init_centroids(k, data, no_of_samples, no_of_dimensions, type);
 	

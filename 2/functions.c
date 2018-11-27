@@ -261,7 +261,10 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 		centroids[0]->count = 0;
 		centroids[0]->prev_count = 0;
 		centroids[0]->assigned_points = (point*)malloc(sizeof(point));
-		centroids[0]->coordinates = data[id]->coordinates;
+		centroids[0]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
+		for(i = 0; i< no_of_dimensions;i++){
+			centroids[0]->coordinates[i] = data[id]->coordinates[i];
+		}
 		found_centers = 1;
 
 		
@@ -302,7 +305,10 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 			centroids[z+1]->count = 0;
 			centroids[z+1]->prev_count = 0;
 			centroids[z+1]->assigned_points = (point*)malloc(sizeof(point));
-			centroids[z+1]->coordinates = data[id]->coordinates;
+			centroids[z+1]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
+			for(i = 0; i< no_of_dimensions;i++){
+				centroids[z+1]->coordinates[i] = data[id]->coordinates[i];
+			}
 			found_centers++;
 		}
 	}
@@ -336,6 +342,7 @@ void lloyds_assignment(centroid * centroids, point* data, int no_of_samples, int
 			(centroids[id])->count +=1;
 			if((centroids[id])->count == 1){
 				(centroids[id])->assigned_points[0] = data[i];
+				centroids[id]->prev_count = centroids[id]->count;
 			}
 			else{
 				centroids[id]->assigned_points = (point*)change_mem(centroids[id]->assigned_points,(centroids[id]->prev_count*sizeof(point)),(centroids[id]->count)*sizeof(point));//Temporal
@@ -355,6 +362,7 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 	int i, j,z;
 	double radius;
 	/*Calculate radius */
+
 	double min_dist= euclidean_distance(centroids[0]->coordinates, centroids[1]->coordinates, no_of_dimensions);
 	for(i = 0; i < *k; i++){
 		for(j = i+1; j < *k; j++){
@@ -376,11 +384,16 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 	hts = (hashtable*)malloc(L * sizeof(hashtable));
 
 	if(metric == 0){
+
 		for(i = 0; i < L; i ++){
 			hashtable_init(&hts[i], table_size);
 		}
+
 		for(i=0;i<no_of_samples;i++){
 			data[i]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
+			for(j = 0; j < L; j++){
+				data[i] -> g_functions[j] = (long long int*)malloc(no_of_functions*sizeof(long long int));
+			}
 		}	
 		for(i = 0; i < L; i++){
 			random_vectors[i] = init(&hts[i], data ,  no_of_samples,  no_of_dimensions, window,  no_of_functions, table_size, L,  i, metric, &t[i], &r[i]);
@@ -391,10 +404,13 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 	
 		int converged = 0;
 		int * old_num = (int*)malloc(sizeof(int)*(*k));
+
 		for(i=0; i < *k; i++){
 			old_num[i] = centroids[i]->count;
 		}
+
 		while(converged == 0){ //Convergence will be done when the number of assigned points for each cluster has remained the same
+			
 			euclidean_lsh_query(data,  centroids, hts,  *k, no_of_samples, no_of_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
 			radius = radius *2;
 			int * new_num = (int*)malloc(sizeof(int)*(*k));
@@ -426,13 +442,16 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 
 	// Free data
 	for(i = 0; i< L;i++){
-		free(hts[i]);
+		hashtable_free(&hts[i]);
 		free(t[i]);
 		free(r[i]);
 		for(j = 0; j < no_of_functions; j++){
 			free(random_vectors[i][j]);
 		}
 		free(random_vectors[i]);
+	}
+	for(i=0; i<no_of_samples;i++){
+		free(data[i]->g_functions);
 	}
 	free(hts);
 	free(t);
@@ -441,14 +460,20 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 }
 
 void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int no_queries, int no_samples, int no_of_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
-	int i, j;
+	int i, j, z;
+	for(i=0;i< no_queries;i++){
+		query_data[i]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
+		for(j = 0; j < L; j++){
+			query_data[i] -> g_functions[j] = (long long int*)malloc(no_of_functions*sizeof(long long int));
+		}
+	}	
 	for(j = 0; j < no_queries; j++){
 		/* L S H */
-		query_data[j]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
+
 		for(i = 0; i < L; i++){
 			
 			//printf("TABLE NO: %d\n", i);
-			long long int index = euclidean_hash_centroid(&query_data[j], no_of_dimensions,  window,   no_of_functions,  table_size, i, t[i], r[i],  random_vectors[i]);			
+			long long int index = euclidean_hash_centroid(query_data[j], no_of_dimensions,  window,   no_of_functions,  table_size, i, t[i], r[i],  random_vectors[i]);			
 			point tmp;
 			tmp = hts[i]->buckets[index].first;
  			
@@ -460,8 +485,6 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 					if(distance < radius && distance!=0){
 						if(data[tmp->id]->centroid_id == -1){\
 							query_data[j]->count++;
-							query_data[j]->assigned_points = (point*)change_mem(query_data[j]->assigned_points,(query_data[j]->prev_count*sizeof(point)),(query_data[j]->count)*sizeof(point));//Temporal
-							query_data[j]->assigned_points[(query_data[j]->count)-1] = data[i];
 							data[tmp->id]->centroid_id = j;
 							data[tmp->id]->centroid2_id = j;
 							query_data[j]->prev_count = query_data[j]->count;
@@ -469,21 +492,34 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 						else{
 							double d1 = euclidean_distance(data[tmp->id]->coordinates, query_data[j]->coordinates, no_of_dimensions);
 							double d2 = euclidean_distance(data[tmp->id]->coordinates, query_data[data[tmp->id]->centroid_id]->coordinates, no_of_dimensions);
-							if( d1 > d2){
-								query_data[j]->prev_count = query_data[j]->count;
+							if( d1 > d2 ){
+								//Add to new cluster	
 								query_data[j]->count++;
-								query_data[j]->assigned_points = (point*)change_mem(query_data[j]->assigned_points,(query_data[j]->prev_count*sizeof(point)),(query_data[j]->count)*sizeof(point));//Temporal
-								query_data[j]->assigned_points[(query_data[j]->count)-1] = data[i];
-								data[tmp->id]->centroid2_id =  data[tmp->id]->centroid_id;
+								query_data[j]->prev_count = query_data[j]->count;
+								//Remove from the old
+								query_data[data[tmp->id]->centroid_id]->count--;
 								data[tmp->id]->centroid_id = j;
-								query_data[j]->prev_count = query_data[j]->count;		
+								data[tmp->id]->centroid2_id = data[tmp->id]->centroid_id;
 							}
 						}
 					}
 				}
 				tmp = tmp -> next;
 			}
+			
 			free(tmp);
+		}
+	}
+	for(i=0;i< no_queries ;i++){
+		if(query_data[i]->count!=0){
+			query_data[i]->assigned_points = (point*)malloc((query_data[i]->count* sizeof(point)));
+			int jj = 0; //position in table
+			for(j = 0; j < no_samples; j++){
+				if(data[j]->centroid_id == i){
+					query_data[i]->assigned_points[jj] = data[j];
+					jj++;
+				}
+			}
 		}
 	}
 }
@@ -523,6 +559,7 @@ void *change_mem(void *ptr, size_t originalLength, size_t newLength){
 void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k){
 // Compute cluster mean and find new centroid
 	int i,j,z ;
+
 	for(i = 0; i < (*k); i++){
 		// If for some reason one cluster is empty, then remove it 
 		if(centroids[i]->count==0){
@@ -534,15 +571,14 @@ void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k
 			printf("Found empty centroid\n");
 		}
 		else{
-			double * mean = (double*)malloc(sizeof(double)*no_of_dimensions);
+
 			for(j = 0; j < no_of_dimensions; j++){
-				mean[j] = 0;
+				centroids[i]->coordinates[j] = 0;
 				for(z = 0; z < centroids[i]->count; z++){
-					mean[j] += centroids[i]->assigned_points[z]->coordinates[j];
+					centroids[i]->coordinates[j] += centroids[i]->assigned_points[z]->coordinates[j];
 				}
-				mean[j] /= centroids[i]->count;
+				centroids[i]->coordinates[j] /= centroids[i]->count;
 			}
-			centroids[i]->coordinates = mean;
 		}
 	}
 }
@@ -597,14 +633,16 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 	// Check where each point falls
 	for(i = 0; i < no_of_samples; i++){
 		data[i]->centroid_id = -1;
+		data[i]->centroid2_id = -1;
 	}
+
 	if(assignment == 0){
 		lloyds_assignment(centroids, data,  no_of_samples,  no_of_dimensions, k);
+
 	}
 	else if(assignment == 1){
 		lsh_assignment(centroids, data, no_of_samples, no_of_dimensions, metric, no_of_functions,  L, k);
 	}
-	/*
 	
 	if(type == 0){
 		basic_update(centroids, data, no_of_dimensions, k);
@@ -612,19 +650,25 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 	else{
 		pam(centroids, data, no_of_dimensions, k);
 	}
-	*/
+	
+	
 }
+
 
 
 void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimensions,int k, int assignment, int metric, int no_of_functions, int L, int type){
 	int converged = 0;
-	int i;
+	int i,j;
 	while(converged == 0){
 		// Save the centroids for later
+		
 		for( i = 0; i< k;i++){
+			free(centroids[i]->assigned_points);
+			centroids[i]->assigned_points = (point*)malloc(sizeof(point));
 			centroids[i] -> count = 0;
 			centroids[i] -> prev_count = 0;
 		}
+		
 		int k_prev = k;
 		centroid * old_cent;
 		old_cent = (centroid*)malloc(sizeof(centroid)*k);
@@ -638,8 +682,7 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 			print_coordinates_cent(old_cent[i], no_of_dimensions);
 			print_coordinates_cent(centroids[i], no_of_dimensions);		
 			printf("\n");
-		}
-		*/
+		}*/
 		printf("TOTAL SAMPLES = %d\n", no_of_samples);
 		for(i=0; i < k; i++){
 			printf("%d\n", centroids[i]->count);
@@ -648,6 +691,7 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 		converged = check_convergence(old_cent, centroids, no_of_dimensions, k_prev, k);
 
 		free(old_cent);
+		//converged=-1;
 	}
 }
 
@@ -716,24 +760,25 @@ double** init(hashtable* ht, point *data , int no_samples, int no_dimensions, in
 	for(i = 0; i < no_of_functions; i++){
 		r_temp[i] = rand() % 100;
 	}
-
 	//Create r-scalars array
 	(*r) = r_temp;
 	// Create matrix of k random vectors and transpose it so we can multiply with data
 	double **random_vectors_temp = (double**)malloc(no_of_functions* sizeof(double*));
 	for(i = 0; i < no_of_functions; i++){
 		random_vectors_temp[i] = create_random_vector(no_dimensions);
+
 	}
 	
 	long long int index;
 	for(i = 0; i < no_samples; i++){
 		if(metric == 0){
-			index = euclidean_hash(&data[i], no_dimensions, window, no_of_functions, table_size, table_id, t_temp, r_temp, random_vectors_temp);
+			index = euclidean_hash(data[i], no_dimensions, window, no_of_functions, table_size, table_id, t_temp, r_temp, random_vectors_temp);
 			/* initialize g functions here not in the hash */
 			hashtable_insert(ht, data[i], index);
+
 		}
 		else{
-			index = cosine_hash(&data[i], no_dimensions, no_of_functions, table_size,  random_vectors_temp);
+			index = cosine_hash(data[i], no_dimensions, no_of_functions, table_size,  random_vectors_temp);
 			/* initialize g functions here not in the hash */
 			hashtable_insert(ht, data[i], index);
 		}
@@ -743,7 +788,7 @@ double** init(hashtable* ht, point *data , int no_samples, int no_dimensions, in
 }
 
 
-int cosine_hash(point* p, int no_dimensions, int no_of_functions, int table_size, double** random_vectors_temp){
+int cosine_hash(point p, int no_dimensions, int no_of_functions, int table_size, double** random_vectors_temp){
 	int index = 0;
 	int i, j;
 	char * hashes;
@@ -751,7 +796,7 @@ int cosine_hash(point* p, int no_dimensions, int no_of_functions, int table_size
 	long double first_hash = 0.0;
 	for(i = 0; i < no_of_functions; i++){
 		for(j = 0; j < no_dimensions; j++){
-			first_hash += ((*p) -> coordinates[j]) * random_vectors_temp[i][j];
+			first_hash += ((p) -> coordinates[j]) * random_vectors_temp[i][j];
 		}
 		if(first_hash >= 0){
 			hashes[i] = '1';
@@ -766,24 +811,27 @@ int cosine_hash(point* p, int no_dimensions, int no_of_functions, int table_size
 	return index;
 }
 
-long long int euclidean_hash(point* p, int no_dimensions, int window,  int no_of_functions, int table_size, int table_id, double* t, int *r, double** random_vectors_temp){
+long long int euclidean_hash(point p, int no_dimensions, int window,  int no_of_functions, int table_size, int table_id, double* t, int *r, double** random_vectors_temp){
 	long long int index = 0;
 	int i, j;
 	long long int * first_hashes;
 	first_hashes = (long long int *)malloc(no_of_functions * sizeof(long long int ));
 	long double first_hash = 0.0;
+
 	for(i = 0; i < no_of_functions; i++){
 		for(j = 0; j < no_dimensions; j++){
-			first_hash += ((((*p) -> coordinates[j] * random_vectors_temp[i][j]) + t[i])/window);
+			first_hash += ((((p) -> coordinates[j] * random_vectors_temp[i][j]) + t[i])/window);
 		}
 		
 		first_hashes[i] = (long long int)floor(first_hash);
-	
 	}
-	(*p) -> g_functions[table_id] = first_hashes;
+	for(i = 0 ; i< no_of_functions; i++){
+		(p) -> g_functions[table_id][i] = first_hashes[i];
+	}
 	// Now that we have the g1(x), g2(x)... gk(x), we will create the φ function = index
 	for(i = 0; i < no_of_functions; i++){
 		index += (r[i] * (first_hashes[i]));
+
 	}
 
 	if(index > 0)
@@ -792,11 +840,12 @@ long long int euclidean_hash(point* p, int no_dimensions, int window,  int no_of
 		index = real_modulo(index,table_size);
 	
 	//printf("%lld\n",index);
+
 	return index;
 }
 
 
-long long int euclidean_hash_centroid(centroid* p, int no_dimensions, int window,  int no_of_functions, int table_size, int table_id, double* t, int *r, double** random_vectors_temp){
+long long int euclidean_hash_centroid(centroid p, int no_dimensions, int window,  int no_of_functions, int table_size, int table_id, double* t, int *r, double** random_vectors_temp){
 	long long int index = 0;
 	int i, j;
 	long long int * first_hashes;
@@ -804,13 +853,15 @@ long long int euclidean_hash_centroid(centroid* p, int no_dimensions, int window
 	long double first_hash = 0.0;
 	for(i = 0; i < no_of_functions; i++){
 		for(j = 0; j < no_dimensions; j++){
-			first_hash += ((((*p) -> coordinates[j] * random_vectors_temp[i][j]) + t[i])/window);
+			first_hash += ((((p) -> coordinates[j] * random_vectors_temp[i][j]) + t[i])/window);
 		}
 		
 		first_hashes[i] = (long long int)floor(first_hash);
 	
 	}
-	(*p) -> g_functions[table_id] = first_hashes;
+	for(i = 0 ; i< no_of_functions; i++){
+		(p) -> g_functions[table_id][i] = first_hashes[i];
+	}
 	// Now that we have the g1(x), g2(x)... gk(x), we will create the φ function = index
 	for(i = 0; i < no_of_functions; i++){
 		index += (r[i] * (first_hashes[i]));

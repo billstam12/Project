@@ -37,8 +37,6 @@ typedef struct centroid{
 	double * coordinates;
 	double silhouette_of_cluster;
 	point* assigned_points;
-	nn_list assigned_points2;
-
 } *centroid;
 
 
