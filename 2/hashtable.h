@@ -60,6 +60,6 @@ void hashtable_init(hashtable *, int );
 int hashtable_size(hashtable);
 void hashtable_insert(hashtable*, point, long long int);
 void hashtable_print(hashtable);
-void hashtable_free(hashtable *);
+void hashtable_free(hashtable *, int);
 void bucket_print(hashtable , int);
 void nn_list_insert(nn_list * , long int , double, int);

@@ -28,6 +28,7 @@ int my_rand(double* , int , int);
 void basic_update(centroid *, point* , int , int * );
 void pam(centroid *, point* , int , int *);
 void lloyds_assignment(centroid * , point* , int , int , int *);
+void lloyds_assignment2(centroid * , point* , int , int , int *);
 void lsh_assignment(centroid* , point* , int , int , int, int, int, int *);
 double** init(hashtable*, point * , int , int , int  , int , int , int, int, int, double ** ,  int ** );
 void euclidean_lsh_query(point* , centroid* ,  hashtable* , int , int , int , int , double , int , int , int , double** , int** , double*** );

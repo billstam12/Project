@@ -5,6 +5,10 @@ void hashtable_init(hashtable *ht, int size){
 	(*ht) -> size = size;
 	(*ht) -> cnt = 0;
 	(*ht) -> buckets = (struct bucket *)malloc(size * sizeof(struct bucket));
+	for(int i = 0; i < size; i++){
+		(*ht)->buckets[i].first=NULL;
+		//(*ht)->buckets[i].last=NULL;
+	}
 }
 
 int hashtable_size(hashtable ht){
@@ -42,10 +46,12 @@ void hashtable_insert(hashtable *ht, point p, long long int index){
 	bucket_insert(&((*ht)->buckets[index]), p);
 }
 
-void hashtable_free(hashtable *ht){
+void hashtable_free(hashtable *ht, int size){
+
 	free((*ht)->buckets);
 	(*ht)->buckets = NULL;
 	(*ht)->size = 0;
+	(*ht)->cnt = 0;
 	free(*ht);
 	(*ht) = NULL;
 }

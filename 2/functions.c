@@ -263,7 +263,7 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 		centroids[0]->assigned_points = (point*)malloc(sizeof(point));
 		centroids[0]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
 		for(i = 0; i< no_of_dimensions;i++){
-			centroids[0]->coordinates[i] = data[id]->coordinates[i];
+			centroids[0]->coordinates[i] = data[id-1]->coordinates[i];
 		}
 		found_centers = 1;
 
@@ -307,7 +307,7 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 			centroids[z+1]->assigned_points = (point*)malloc(sizeof(point));
 			centroids[z+1]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
 			for(i = 0; i< no_of_dimensions;i++){
-				centroids[z+1]->coordinates[i] = data[id]->coordinates[i];
+				centroids[z+1]->coordinates[i] = data[id-1]->coordinates[i];
 			}
 			found_centers++;
 		}
@@ -345,7 +345,8 @@ void lloyds_assignment(centroid * centroids, point* data, int no_of_samples, int
 				centroids[id]->prev_count = centroids[id]->count;
 			}
 			else{
-				centroids[id]->assigned_points = (point*)change_mem(centroids[id]->assigned_points,(centroids[id]->prev_count*sizeof(point)),(centroids[id]->count)*sizeof(point));//Temporal
+				centroids[id]->assigned_points = (point*)realloc(centroids[id]->assigned_points,(centroids[id]->count)*sizeof(point));//Temporal
+				//centroids[id]->assigned_points = (point*)change_mem(centroids[id]->assigned_points,(centroids[id]->prev_count*sizeof(point)),(centroids[id]->count)*sizeof(point));//Temporal
 				centroids[id]->assigned_points[(centroids[id]->count)-1] = data[i];
 				centroids[id]->prev_count = centroids[id]->count;
 			}
@@ -354,6 +355,35 @@ void lloyds_assignment(centroid * centroids, point* data, int no_of_samples, int
 	}
 }
 
+void lloyds_assignment_lsh(centroid * centroids, point* data, int no_of_samples, int no_of_dimensions, int *k){
+	int i,j,z;
+	double min;
+	int id, min2_id;
+
+	for(i = 0; i < no_of_samples; i++){
+		if(data[i]->centroid_id == -1){
+			min = euclidean_distance((centroids[0])->coordinates, (data[i])->coordinates, no_of_dimensions);
+			id = (centroids[0])->id;
+			double dist;
+
+			for(j = 1; j < (*k); j++){
+				dist = euclidean_distance((centroids[j])->coordinates, (data[i])->coordinates, no_of_dimensions);
+				if(dist < min){
+					min2_id = id;
+					min = dist;
+					id = (centroids[j])-> id;
+				}
+			}
+			(data[i])->centroid_id = id;
+			(data[i])->centroid2_id = min2_id;
+
+			(centroids[id])->count +=1;
+			centroids[id]->prev_count = centroids[id]->count;
+			
+			//printf("Point with ID:%ld was classified in %ld with distance %f\n",data[i]->id, id, dist);
+		}
+	}
+}
 
 
 void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int no_of_functions, int L, int *k){
@@ -434,15 +464,27 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 		}
 		printf("count=%d\n", count);
 		printf("count2=%d\n", count2);
-
+		
 		// Now assign each unassigned point with lloyds
-		lloyds_assignment(centroids, data, no_of_samples, no_of_dimensions, k);
+		lloyds_assignment_lsh(centroids, data, no_of_samples, no_of_dimensions, k);
+		for(i=0;i< (*k) ;i++){
+			if(centroids[i]->count!=0){
+				centroids[i]->assigned_points = (point*)malloc((centroids[i]->count* sizeof(point)));
+				int jj = 0; //position in table
+				for(j = 0; j < no_of_samples; j++){
+					if(data[j]->centroid_id == i){
+						centroids[i]->assigned_points[jj] = data[j];
+						jj++;
+					}
+				}
+			}
+		}
 	}
 
 
 	// Free data
 	for(i = 0; i< L;i++){
-		hashtable_free(&hts[i]);
+		hashtable_free(&hts[i], table_size);
 		free(t[i]);
 		free(r[i]);
 		for(j = 0; j < no_of_functions; j++){
@@ -474,15 +516,14 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 			
 			//printf("TABLE NO: %d\n", i);
 			long long int index = euclidean_hash_centroid(query_data[j], no_of_dimensions,  window,   no_of_functions,  table_size, i, t[i], r[i],  random_vectors[i]);			
-			point tmp;
+			point tmp=NULL;
 			tmp = hts[i]->buckets[index].first;
- 			
 			while(tmp != NULL){
 				int g_func;
 				g_func = compare_gfuncs(tmp->g_functions[i], query_data[j]->g_functions[i], no_of_functions);
 				if(g_func == 1){
 					double distance = euclidean_distance(tmp->coordinates, query_data[j]->coordinates, no_of_dimensions);
-					if(distance < radius && distance!=0){
+					if((distance < radius) && (distance!=0)){
 						if(data[tmp->id]->centroid_id == -1){\
 							query_data[j]->count++;
 							data[tmp->id]->centroid_id = j;
@@ -498,29 +539,19 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 								query_data[j]->prev_count = query_data[j]->count;
 								//Remove from the old
 								query_data[data[tmp->id]->centroid_id]->count--;
-								data[tmp->id]->centroid_id = j;
 								data[tmp->id]->centroid2_id = data[tmp->id]->centroid_id;
+								data[tmp->id]->centroid_id = j;
 							}
 						}
 					}
 				}
 				tmp = tmp -> next;
+				if(tmp!=NULL)
+					printf("%ld\n",tmp->id);
 			}
-			
 			free(tmp);
 		}
-	}
-	for(i=0;i< no_queries ;i++){
-		if(query_data[i]->count!=0){
-			query_data[i]->assigned_points = (point*)malloc((query_data[i]->count* sizeof(point)));
-			int jj = 0; //position in table
-			for(j = 0; j < no_samples; j++){
-				if(data[j]->centroid_id == i){
-					query_data[i]->assigned_points[jj] = data[j];
-					jj++;
-				}
-			}
-		}
+		printf("\n");
 	}
 }
 
