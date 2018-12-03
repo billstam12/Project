@@ -73,7 +73,6 @@ point * parse_data(FILE* f, int* no_samples, int* no_dimensions){
 	}
 	*no_dimensions = dims;
 	rewind(f);
-	read = getline(&line, &len, f); //Rewind and read first line
 
 	/*  First create an array of points so we can store 
 		each of the points in the memory. Then, we will begin
@@ -189,6 +188,13 @@ void print_coordinates_cent(centroid p, int no_dimensions){
 	printf("\n");
 }
 
+void fprint_coordinates_cent(FILE* o, centroid p, int no_dimensions){
+	int i;
+	for( i = 0; i < no_dimensions; i++)
+		fprintf(o, "%f ", p->coordinates[i]);	
+	fprintf(o, "\n");
+}
+
 int my_rand(double* freq, int n, int id){
     // Create and fill prefix array
     double *prefix;
@@ -225,7 +231,7 @@ void copy_point(point* p1, point p2, int no_of_dimensions){
 	int i;
 	(*p1)->id = p2->id;
 	(*p1)->centroid_id = p2->centroid_id;
-	printf("%ld\n", (*p1)->id);
+	(*p1)->centroid2_id = p2->centroid2_id;
 	(*p1)->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
 	for(i = 0; i < no_of_dimensions; i++){
 		(*p1)->coordinates[i] = p2->coordinates[i];
@@ -248,7 +254,12 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 			centroids[i]->count = 0;
 			centroids[i]->prev_count = -1;
 			centroids[i]->assigned_points = (point*)malloc(sizeof(point));
-			centroids[i]->coordinates = data[rand()%no_of_samples]->coordinates;
+			//centroids[i]->coordinates = data[rand()%no_of_samples]->coordinates;
+			centroids[i]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
+			int random_index = rand()%no_of_samples;
+			for(j = 0; j< no_of_dimensions;j++){
+				centroids[i]->coordinates[j] = data[random_index]->coordinates[j];
+			}
 		}
 	}
 	else{
@@ -259,7 +270,6 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 		new_centroid = (centroid)malloc(sizeof(struct centroid));
 		centroids[0] = new_centroid;
 		centroids[0]->count = 0;
-		centroids[0]->prev_count = 0;
 		centroids[0]->assigned_points = (point*)malloc(sizeof(point));
 		centroids[0]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
 		for(i = 0; i< no_of_dimensions;i++){
@@ -303,7 +313,7 @@ centroid * init_centroids(int k, point* data, int no_of_samples, int no_of_dimen
 			centroids[z+1] = new_centroid;
 			centroids[z+1]->id = z+1;
 			centroids[z+1]->count = 0;
-			centroids[z+1]->prev_count = 0;
+			centroids[z+1]->prev_count = -1;
 			centroids[z+1]->assigned_points = (point*)malloc(sizeof(point));
 			centroids[z+1]->coordinates = (double*)malloc(no_of_dimensions*sizeof(double));
 			for(i = 0; i< no_of_dimensions;i++){
@@ -326,8 +336,8 @@ void lloyds_assignment(centroid * centroids, point* data, int no_of_samples, int
 		if(data[i]->centroid_id == -1){
 			min = euclidean_distance((centroids[0])->coordinates, (data[i])->coordinates, no_of_dimensions);
 			id = (centroids[0])->id;
+			min2_id = id;
 			double dist;
-
 			for(j = 1; j < (*k); j++){
 				dist = euclidean_distance((centroids[j])->coordinates, (data[i])->coordinates, no_of_dimensions);
 				if(dist < min){
@@ -339,23 +349,28 @@ void lloyds_assignment(centroid * centroids, point* data, int no_of_samples, int
 			(data[i])->centroid_id = id;
 			(data[i])->centroid2_id = min2_id;
 
-			(centroids[id])->count +=1;
-			if((centroids[id])->count == 1){
-				(centroids[id])->assigned_points[0] = data[i];
-				centroids[id]->prev_count = centroids[id]->count;
-			}
-			else{
-				centroids[id]->assigned_points = (point*)realloc(centroids[id]->assigned_points,(centroids[id]->count)*sizeof(point));//Temporal
-				//centroids[id]->assigned_points = (point*)change_mem(centroids[id]->assigned_points,(centroids[id]->prev_count*sizeof(point)),(centroids[id]->count)*sizeof(point));//Temporal
-				centroids[id]->assigned_points[(centroids[id]->count)-1] = data[i];
-				centroids[id]->prev_count = centroids[id]->count;
-			}
+			(centroids[id])->count +=1;		
 			//printf("Point with ID:%ld was classified in %ld with distance %f\n",data[i]->id, id, dist);
 		}
+
 	}
+	for(i=0;i< (*k) ;i++){
+		if(centroids[i]->count!=0){
+			centroids[i]->assigned_points = (point*)malloc((centroids[i]->count* sizeof(point)));
+			int jj = 0; //position in table
+			for(j = 0; j < no_of_samples; j++){
+				if(data[j]->centroid_id == i){
+					centroids[i]->assigned_points[jj] = data[j];
+					jj++;
+				}
+			}
+		}
+	}
+
 }
 
 void lloyds_assignment_lsh(centroid * centroids, point* data, int no_of_samples, int no_of_dimensions, int *k){
+	/* Very simple assignment, just assign the closest points, deterministically */
 	int i,j,z;
 	double min;
 	int id, min2_id;
@@ -364,6 +379,7 @@ void lloyds_assignment_lsh(centroid * centroids, point* data, int no_of_samples,
 		if(data[i]->centroid_id == -1){
 			min = euclidean_distance((centroids[0])->coordinates, (data[i])->coordinates, no_of_dimensions);
 			id = (centroids[0])->id;
+			min2_id = id;
 			double dist;
 
 			for(j = 1; j < (*k); j++){
@@ -375,22 +391,22 @@ void lloyds_assignment_lsh(centroid * centroids, point* data, int no_of_samples,
 				}
 			}
 			(data[i])->centroid_id = id;
-			(data[i])->centroid2_id = min2_id;
+			(data[i])->centroid2_id = min2_id; //Don't forget to add the second id for the shillouette
 
 			(centroids[id])->count +=1;
-			centroids[id]->prev_count = centroids[id]->count;
 			
 			//printf("Point with ID:%ld was classified in %ld with distance %f\n",data[i]->id, id, dist);
 		}
 	}
+		
 }
 
 
-void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int no_of_functions, int L, int *k){
-	int table_size = no_of_samples/12;
-	int window = 30;
+void hypercube_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int no_of_functions, int L, int *k){
 	int i, j,z;
 	double radius;
+	int max = 10;
+	int probes = 4;
 	/*Calculate radius */
 
 	double min_dist= euclidean_distance(centroids[0]->coordinates, centroids[1]->coordinates, no_of_dimensions);
@@ -404,6 +420,93 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 	}
 	radius = min_dist /2;
 	//printf("%f\n",radius);
+	int table_size;
+	
+	table_size = pow(2,no_of_functions);
+	hashtable hypercube = (hashtable)malloc(sizeof(struct hashtable));
+	hashtable_init(&hypercube, table_size);
+	double ** hyperplanes;
+	hyperplanes = (double**)malloc(sizeof(double**));
+	for(i = 0; i < no_of_functions; i++){
+		hyperplanes[i] = create_random_vector(no_of_dimensions);
+	}
+	long long int index;
+	for(i = 0; i < no_of_samples; i++){
+		index = cosine_hash(data[i], no_of_dimensions, no_of_functions, table_size, hyperplanes);
+		hashtable_insert(&hypercube, data[i], index);
+	}
+		
+	
+	
+	/* Now we will give the queries to our hashtables */
+	int converged = 0;
+	int * old_num = (int*)malloc(sizeof(int)*(*k));
+	for(i=0; i < *k; i++){
+		old_num[i] = centroids[i]->count;
+	}
+	int l = 0;
+	int max_loops = 4;
+	while(converged == 0 && l < max_loops){ //Convergence will be done when the number of assigned points for each cluster has remained the same
+		hypercube_query(data, centroids, hypercube, *k, no_of_samples, no_of_dimensions, radius, no_of_functions, table_size, probes, max, hyperplanes);
+		radius = radius *2;
+		int * new_num = (int*)malloc(sizeof(int)*(*k));
+		for(i=0; i < *k; i++){
+			new_num[i] = centroids[i]->count;
+		}
+		converged = check_lsh_convergence(new_num,old_num, *k);
+		for(i=0; i < *k; i++){
+			old_num[i] = new_num[i];
+		}
+		l++;
+	}
+	int count = 0;
+	int count2 =0;
+	for(i = 0; i< no_of_samples; i++){
+		if(data[i]->centroid_id == -1){
+			count ++;
+		}
+		else{
+			count2 ++;
+		}
+	}
+	
+	// Now assign each unassigned point with lloyds
+	lloyds_assignment_lsh(centroids, data, no_of_samples, no_of_dimensions, k);
+	for(i=0;i< (*k) ;i++){
+		if(centroids[i]->count!=0){
+			centroids[i]->assigned_points = (point*)malloc((centroids[i]->count* sizeof(point)));
+			int jj = 0; //position in table
+			for(j = 0; j < no_of_samples; j++){
+				if(data[j]->centroid_id == i){
+					centroids[i]->assigned_points[jj] = data[j];
+					jj++;
+				}
+			}
+		}
+	}
+	// Free data
+	
+}
+
+void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_of_dimensions, int metric, int no_of_functions, int L, int *k){
+	int window = 30;
+	int i, j,z;
+	double radius;
+	/*Calculate radius by finding the minimum distance between the centroids and dividing by half
+	that way we make sure that the points won't be falling in two centroids.*/
+
+	double min_dist= euclidean_distance(centroids[0]->coordinates, centroids[1]->coordinates, no_of_dimensions);
+	for(i = 0; i < *k; i++){
+		for(j = i+1; j < *k; j++){
+			double dist = euclidean_distance(centroids[i]->coordinates, centroids[j]->coordinates, no_of_dimensions);
+			if( dist < min_dist){
+				min_dist = dist;
+			}
+		}
+	}
+	//Initialize the hashtable variables
+	radius = min_dist /2;
+	//printf("%f\n",radius);
 	double ** t; // t array
 	t = (double**)malloc(L*sizeof(double*));
 	int ** r; // r array
@@ -412,13 +515,16 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 	random_vectors = (double***)malloc(L*sizeof(double**));
 	hashtable * hts;
 	hts = (hashtable*)malloc(L * sizeof(hashtable));
-
+	int table_size;
 	if(metric == 0){
+		table_size = no_of_samples/12;
 
 		for(i = 0; i < L; i ++){
 			hashtable_init(&hts[i], table_size);
+			//hashtable_print(hts[i]);
 		}
-
+		//exit(-1);
+		//g_functions of each point are stored here
 		for(i=0;i<no_of_samples;i++){
 			data[i]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
 			for(j = 0; j < L; j++){
@@ -427,7 +533,6 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 		}	
 		for(i = 0; i < L; i++){
 			random_vectors[i] = init(&hts[i], data ,  no_of_samples,  no_of_dimensions, window,  no_of_functions, table_size, L,  i, metric, &t[i], &r[i]);
-			//hashtable_print(hts[i]);
 		}
 
 		/* Now we will give the queries to our hashtables */
@@ -438,9 +543,7 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 		for(i=0; i < *k; i++){
 			old_num[i] = centroids[i]->count;
 		}
-
-		while(converged == 0){ //Convergence will be done when the number of assigned points for each cluster has remained the same
-			
+		while((converged == 0)){ //Convergence will be done when the number of assigned points for each cluster has remained the same
 			euclidean_lsh_query(data,  centroids, hts,  *k, no_of_samples, no_of_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
 			radius = radius *2;
 			int * new_num = (int*)malloc(sizeof(int)*(*k));
@@ -462,8 +565,67 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 				count2 ++;
 			}
 		}
-		printf("count=%d\n", count);
-		printf("count2=%d\n", count2);
+		
+		// Now assign each unassigned point with lloyds
+		lloyds_assignment_lsh(centroids, data, no_of_samples, no_of_dimensions, k);
+		for(i=0;i< (*k) ;i++){
+			if(centroids[i]->count!=0){
+				centroids[i]->assigned_points = (point*)malloc((centroids[i]->count* sizeof(point)));
+				int jj = 0; //position in table
+				for(j = 0; j < no_of_samples; j++){
+					if(data[j]->centroid_id == i){
+						centroids[i]->assigned_points[jj] = data[j];
+						jj++;
+					}
+				}
+			}
+		}
+	}
+	else{
+		table_size = pow(2,no_of_functions);
+
+		for(i = 0; i < L; i ++){
+			hashtable_init(&hts[i], table_size);
+			//hashtable_print(hts[i]);
+		}
+		for(i = 0; i < L; i++){
+			random_vectors[i] = init(&hts[i], data ,  no_of_samples,  no_of_dimensions, window,  no_of_functions, table_size, L,  i, metric, &t[i], &r[i]);
+		}
+
+		/* Now we will give the queries to our hashtables */
+	
+		int converged = 0;
+		int * old_num = (int*)malloc(sizeof(int)*(*k));
+
+		for(i=0; i < *k; i++){
+			old_num[i] = centroids[i]->count;
+		}
+
+		int l = 0;
+		int max_loops = 4;
+		while(converged == 0 && l < max_loops){ //Convergence will be done when the number of assigned points for each cluster has remained the same
+			cosine_lsh_query(data,  centroids, hts,  *k, no_of_samples, no_of_dimensions,  L,  radius,  window,  no_of_functions,  table_size,  t,  r,  random_vectors);
+			radius = radius *2;
+			int * new_num = (int*)malloc(sizeof(int)*(*k));
+			for(i=0; i < *k; i++){
+				new_num[i] = centroids[i]->count;
+			}
+			converged = check_lsh_convergence(new_num,old_num, *k);
+			for(i=0; i < *k; i++){
+				old_num[i] = new_num[i];
+			}
+			l++;
+		}
+		int count = 0;
+		int count2 =0;
+		for(i = 0; i< no_of_samples; i++){
+			if(data[i]->centroid_id == -1){
+				count ++;
+			}
+			else{
+				count2 ++;
+			}
+		}
 		
 		// Now assign each unassigned point with lloyds
 		lloyds_assignment_lsh(centroids, data, no_of_samples, no_of_dimensions, k);
@@ -481,7 +643,6 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 		}
 	}
 
-
 	// Free data
 	for(i = 0; i< L;i++){
 		hashtable_free(&hts[i], table_size);
@@ -492,13 +653,61 @@ void lsh_assignment(centroid* centroids, point* data, int no_of_samples, int no_
 		}
 		free(random_vectors[i]);
 	}
-	for(i=0; i<no_of_samples;i++){
-		free(data[i]->g_functions);
+	if(metric == 0){
+		for(i=0; i<no_of_samples;i++){
+			free(data[i]->g_functions);
+		}
 	}
 	free(hts);
 	free(t);
 	free(r);
 	free(random_vectors);
+}
+
+void hypercube_query(point* data, centroid* query_data, hashtable hypercube , int no_queries, int no_samples, int no_of_dimensions, double radius, int no_of_functions, int table_size, int probes, int max, double** random_vectors){
+	int i, j;
+	for(j = 0; j < no_queries; j++){
+		/* L S H */
+
+		nn_list nearest_neighbors = (struct nn_list *)malloc(sizeof(struct nn_list));
+			
+		//printf("TABLE NO: %d\n", i);
+		long long int index = cosine_hash_centroid(query_data[j], no_of_dimensions, no_of_functions,  table_size, random_vectors);			
+		point tmp;
+		tmp = hypercube->buckets[index]->first; //first item of bucket
+ 		
+ 		int count = 0;
+		while(tmp != NULL ){
+			count ++;
+			if(count <= max){
+				double distance = euclidean_distance(tmp->coordinates, query_data[j]->coordinates, no_of_dimensions);
+				if((distance < radius) && (distance!=0)){ 
+					//printf("%ld=%ld\n",tmp->id, data[tmp->id-1]->id);
+					if(data[tmp->id-1]->centroid_id == -1){
+						query_data[j]->count++;
+						data[tmp->id-1]->centroid_id = j;
+						data[tmp->id-1]->centroid2_id = j;
+						query_data[j]->prev_count = query_data[j]->count;
+					}
+					else{
+						double d1 = euclidean_distance(data[tmp->id-1]->coordinates, query_data[j]->coordinates, no_of_dimensions);
+						double d2 = euclidean_distance(data[tmp->id-1]->coordinates, query_data[data[tmp->id-1]->centroid_id]->coordinates, no_of_dimensions);
+						if( d1 > d2 ){
+							//Add to new cluster	
+							query_data[j]->count++;
+							query_data[j]->prev_count = query_data[j]->count;
+							//Remove from the old
+							query_data[data[tmp->id-1]->centroid_id]->count--;
+							data[tmp->id-1]->centroid2_id = data[tmp->id-1]->centroid_id;
+							data[tmp->id-1]->centroid_id = j;
+						}
+					}
+				}	
+			}
+			else break;
+			tmp = tmp -> next;
+		}
+	}
 }
 
 void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int no_queries, int no_samples, int no_of_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
@@ -517,44 +726,82 @@ void euclidean_lsh_query(point* data, centroid* query_data, hashtable* hts, int 
 			//printf("TABLE NO: %d\n", i);
 			long long int index = euclidean_hash_centroid(query_data[j], no_of_dimensions,  window,   no_of_functions,  table_size, i, t[i], r[i],  random_vectors[i]);			
 			point tmp=NULL;
-			tmp = hts[i]->buckets[index].first;
+			tmp = hts[i]->buckets[index]->first;
 			while(tmp != NULL){
 				int g_func;
 				g_func = compare_gfuncs(tmp->g_functions[i], query_data[j]->g_functions[i], no_of_functions);
 				if(g_func == 1){
 					double distance = euclidean_distance(tmp->coordinates, query_data[j]->coordinates, no_of_dimensions);
 					if((distance < radius) && (distance!=0)){
-						if(data[tmp->id]->centroid_id == -1){\
+						//printf("%ld=%ld\n",tmp->id, data[tmp->id-1]->id);
+						if(data[tmp->id-1]->centroid_id == -1){
 							query_data[j]->count++;
-							data[tmp->id]->centroid_id = j;
-							data[tmp->id]->centroid2_id = j;
+							data[tmp->id-1]->centroid_id = j;
+							data[tmp->id-1]->centroid2_id = j;
 							query_data[j]->prev_count = query_data[j]->count;
 						}
 						else{
-							double d1 = euclidean_distance(data[tmp->id]->coordinates, query_data[j]->coordinates, no_of_dimensions);
-							double d2 = euclidean_distance(data[tmp->id]->coordinates, query_data[data[tmp->id]->centroid_id]->coordinates, no_of_dimensions);
+							double d1 = euclidean_distance(data[tmp->id-1]->coordinates, query_data[j]->coordinates, no_of_dimensions);
+							double d2 = euclidean_distance(data[tmp->id-1]->coordinates, query_data[data[tmp->id-1]->centroid_id]->coordinates, no_of_dimensions);
 							if( d1 > d2 ){
 								//Add to new cluster	
 								query_data[j]->count++;
 								query_data[j]->prev_count = query_data[j]->count;
 								//Remove from the old
-								query_data[data[tmp->id]->centroid_id]->count--;
-								data[tmp->id]->centroid2_id = data[tmp->id]->centroid_id;
-								data[tmp->id]->centroid_id = j;
+								query_data[data[tmp->id-1]->centroid_id]->count--;
+								data[tmp->id-1]->centroid2_id = data[tmp->id-1]->centroid_id;
+								data[tmp->id-1]->centroid_id = j;
 							}
 						}
 					}
 				}
 				tmp = tmp -> next;
-				if(tmp!=NULL)
-					printf("%ld\n",tmp->id);
 			}
 			free(tmp);
 		}
-		printf("\n");
 	}
 }
 
+void cosine_lsh_query(point* data, centroid* query_data, hashtable* hts, int no_queries, int no_samples, int no_of_dimensions, int L, double radius, int window, int no_of_functions, int table_size, double** t, int** r, double*** random_vectors){
+	int i, j, z;	
+	for(j = 0; j < no_queries; j++){
+		/* L S H */
+
+		for(i = 0; i < L; i++){
+			
+			//printf("TABLE NO: %d\n", i);
+			long long int index = cosine_hash_centroid(query_data[j], no_of_dimensions, no_of_functions, table_size, random_vectors[i]);			
+			point tmp=NULL;
+			tmp = hts[i]->buckets[index]->first;
+			while(tmp != NULL){
+				
+				double distance = cosine_similarity(tmp->coordinates, query_data[j]->coordinates, no_of_dimensions);
+				if((distance < radius) && (distance!=0)){
+					//printf("%ld=%ld\n",tmp->id, data[tmp->id-1]->id);
+					if(data[tmp->id-1]->centroid_id == -1){
+						query_data[j]->count++;
+						data[tmp->id-1]->centroid_id = j;
+						data[tmp->id-1]->centroid2_id = j;
+					}
+					else{
+						double d1 = cosine_similarity(data[tmp->id-1]->coordinates, query_data[j]->coordinates, no_of_dimensions);
+						double d2 = cosine_similarity(data[tmp->id-1]->coordinates, query_data[data[tmp->id-1]->centroid_id]->coordinates, no_of_dimensions);
+						if( d1 > d2 ){
+							//Add to new cluster	
+							query_data[j]->count++;
+							//Remove from the old
+							query_data[data[tmp->id-1]->centroid_id]->count--;
+							data[tmp->id-1]->centroid2_id = data[tmp->id-1]->centroid_id;
+							data[tmp->id-1]->centroid_id = j;
+						}
+					}
+				}
+				tmp = tmp -> next;
+			}
+			free(tmp);
+		}
+	}
+}
 
 
 void *change_mem(void *ptr, size_t originalLength, size_t newLength){
@@ -588,7 +835,7 @@ void *change_mem(void *ptr, size_t originalLength, size_t newLength){
 
 /* UPDATE FUNCTIONS */
 void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k){
-// Compute cluster mean and find new centroid
+	// Compute cluster mean and find new centroid
 	int i,j,z ;
 
 	for(i = 0; i < (*k); i++){
@@ -599,10 +846,10 @@ void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k
 			}
 			i -= 1;
 			*k -= 1;
-			printf("Found empty centroid\n");
+			fprintf(stderr, "ERROR! Update resulted in an empty centroid, please rerun with different parameters\n");
+			exit(-1);
 		}
 		else{
-
 			for(j = 0; j < no_of_dimensions; j++){
 				centroids[i]->coordinates[j] = 0;
 				for(z = 0; z < centroids[i]->count; z++){
@@ -615,6 +862,9 @@ void basic_update(centroid *centroids, point* data, int no_of_dimensions, int *k
 }
 
 void pam(centroid *centroids, point* data, int no_of_dimensions, int *k){
+	/* PAM was implemented in the following way. For each centroid we already have we find 
+	the distance as a centroid each of it's assigned points would have. After we do that we find the minimum
+	and make that point the new centroid */
 // Compute cluster cost function and find new centroid
 	int i,j,z ;
 	for(i = 0; i < (*k); i++){
@@ -632,7 +882,8 @@ void pam(centroid *centroids, point* data, int no_of_dimensions, int *k){
 			}
 			i -= 1;
 			*k -= 1;
-			printf("PAM found empty centroid\n");
+			fprintf(stderr, "ERROR! Update resulted in an empty centroid, please rerun with different parameters\n");
+			exit(-1);
 		}
 		else{
 			for( j = 0; j < centroids[i]->count; j++){
@@ -666,7 +917,7 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 		data[i]->centroid_id = -1;
 		data[i]->centroid2_id = -1;
 	}
-
+	/* Type of assignment, lloyds, lsh and hypercube*/
 	if(assignment == 0){
 		lloyds_assignment(centroids, data,  no_of_samples,  no_of_dimensions, k);
 
@@ -674,7 +925,10 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 	else if(assignment == 1){
 		lsh_assignment(centroids, data, no_of_samples, no_of_dimensions, metric, no_of_functions,  L, k);
 	}
-	
+	else if(assignment == 2){
+		hypercube_assignment(centroids, data, no_of_samples, no_of_dimensions, metric, no_of_functions,  L, k);
+	}
+	/* Update type, base or PAM */
 	if(type == 0){
 		basic_update(centroids, data, no_of_dimensions, k);
 	}
@@ -687,15 +941,20 @@ void compute_cluster(centroid * centroids, point * data, int no_of_samples, int 
 
 
 
-void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimensions,int k, int assignment, int metric, int no_of_functions, int L, int type){
+void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimensions,int k, int assignment, int metric, int no_of_functions, int L, int type, FILE* o){
 	int converged = 0;
 	int i,j;
-	while(converged == 0){
+	clock_t start, end;
+	double cpu_time_used;
+ 	start = clock();
+ 	int max_loops = 0;
+	while(converged == 0 && max_loops < 20){
+		max_loops ++;
 		// Save the centroids for later
 		
 		for( i = 0; i< k;i++){
 			free(centroids[i]->assigned_points);
-			centroids[i]->assigned_points = (point*)malloc(sizeof(point));
+			centroids[i]->assigned_points = NULL;
 			centroids[i] -> count = 0;
 			centroids[i] -> prev_count = 0;
 		}
@@ -714,16 +973,20 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 			print_coordinates_cent(centroids[i], no_of_dimensions);		
 			printf("\n");
 		}*/
-		printf("TOTAL SAMPLES = %d\n", no_of_samples);
-		for(i=0; i < k; i++){
-			printf("%d\n", centroids[i]->count);
-		}
 		//Check for convergence
 		converged = check_convergence(old_cent, centroids, no_of_dimensions, k_prev, k);
 
 		free(old_cent);
 		//converged=-1;
 	}
+	for(i = 0; i < k; i++){
+		fprintf(o, "CLUSTER: %d SIZE: %d ",i, centroids[i]->count );
+		fprint_coordinates_cent(o, centroids[i], no_of_dimensions);
+		fprintf(o,"\n");
+	}
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	fprintf(o, "Clustering Time:%f\n", cpu_time_used);
 }
 
 int check_convergence(centroid * c1, centroid* c2, int no_of_dimensions, int k_prev, int k){
@@ -742,12 +1005,11 @@ int check_convergence(centroid * c1, centroid* c2, int no_of_dimensions, int k_p
 }
 
 
-void shilouette_evaluation(centroid* centroids,point* data,int no_of_samples,int no_of_dimensions){
+void shilouette_evaluation(FILE * o, centroid* centroids,point* data,int no_of_samples,int L, int no_of_dimensions){
 	int i,j;
 	for(i = 0 ; i < no_of_samples; i++){
 		int a_id = data[i]->centroid_id;
 		int b_id = data[i]->centroid2_id;
-
 		long double a = 0;
 		long double b = 0;
 		for(j = 0; j < centroids[a_id]->count; j++){
@@ -762,6 +1024,16 @@ void shilouette_evaluation(centroid* centroids,point* data,int no_of_samples,int
 		}
 		else{ max = b;}
 		data[i]->silhouette= ((b-a)/max);
+	}
+	for(i = 0; i < L; i++){
+		centroids[i]->silhouette_of_cluster = 0.0;
+	}
+	for(i = 0; i < L; i++){
+		for(j = 0; j < centroids[i]->count; j++){
+			centroids[i]->silhouette_of_cluster+=centroids[i]->assigned_points[j]->silhouette;
+		}
+		centroids[i]->silhouette_of_cluster /= centroids[i]->count;
+		fprintf(o, "Shillouette of cluster %d is: %f\n",i, centroids[i]->silhouette_of_cluster);
 	}
 }
 
@@ -805,6 +1077,7 @@ double** init(hashtable* ht, point *data , int no_samples, int no_dimensions, in
 		if(metric == 0){
 			index = euclidean_hash(data[i], no_dimensions, window, no_of_functions, table_size, table_id, t_temp, r_temp, random_vectors_temp);
 			/* initialize g functions here not in the hash */
+			//printf("%lld\n", index);
 			hashtable_insert(ht, data[i], index);
 
 		}
@@ -820,6 +1093,30 @@ double** init(hashtable* ht, point *data , int no_samples, int no_dimensions, in
 
 
 int cosine_hash(point p, int no_dimensions, int no_of_functions, int table_size, double** random_vectors_temp){
+	int index = 0;
+	int i, j;
+	char * hashes;
+	hashes = (char *)malloc(no_of_functions * (sizeof( char )+1));
+	long double first_hash = 0.0;
+	for(i = 0; i < no_of_functions; i++){
+		for(j = 0; j < no_dimensions; j++){
+			first_hash += ((p) -> coordinates[j]) * random_vectors_temp[i][j];
+		}
+		if(first_hash >= 0){
+			hashes[i] = '1';
+		}
+		else{
+			hashes[i] = '0';
+		}
+	}
+	hashes[no_of_functions] = '\0';
+	index = binary_string_to_num(hashes);
+
+	return index;
+}
+
+
+int cosine_hash_centroid(centroid p, int no_dimensions, int no_of_functions, int table_size, double** random_vectors_temp){
 	int index = 0;
 	int i, j;
 	char * hashes;
@@ -915,4 +1212,45 @@ int compare_gfuncs(long long int * g1, long long int * g2, int no_of_functions){
 		i++;
 	}
 	return b;
+}
+
+
+
+
+void print_stuff1(FILE* o, int type, int update, int assignment, int metric){
+	fprintf(o,"Algorithm:");
+	if(type==0){
+		fprintf(o,"Initialization:Random");
+	}
+	else if(type==1){
+		fprintf(o,"Initialization:K-Means++");
+	}
+	else{
+		fprintf(stderr, "Error! Give Correct Type: 0 for random 1 for k-means++");
+		exit(-1);
+	}
+	if(update==0){
+		fprintf(o," Update:Basic");
+	}
+	else if(update==1){
+		fprintf(o," Update:Partitioning Around Medoids");
+	}
+	else{
+		fprintf(stderr, "Error! Give Correct Type: 0 for Basic 1 for PAM");
+		exit(-1);
+	}
+	if(assignment==0){
+		fprintf(o," Assignment:k-means");
+	}
+	else if(assignment==1){
+		fprintf(o," Assignment:LSH");
+	}
+	else if(assignment==2){
+		fprintf(o," Assignment:Hypercube");
+	}
+	else{
+		fprintf(stderr, "Error! Give Correct Type: 0 for K-Means 1 for LSH 2 for Hypercube");
+		exit(-1);
+	}
+	fprintf(o,"\n");
 }

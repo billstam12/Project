@@ -185,7 +185,7 @@ void euclidean_lsh_query(point* data, point* query_data, char * output, hashtabl
 	    start = clock();
 	    
 		fprintf(o,"-------------------------------------------------------\n");
-		fprintf(o,"Query: %ld\n", query_data[j]->id);
+		fprintf(o,"Query: %ld\n", query_data[j]->id);e
 		fprintf(o,"R-near neighbors:\n");
 		query_data[j]->g_functions = (long long int**)malloc(sizeof(long long int)* L);
 		nn_list nearest_neighbors = (struct nn_list *)malloc(sizeof(struct nn_list));

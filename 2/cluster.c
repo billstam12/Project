@@ -13,7 +13,8 @@ int main(int argc, char** argv){
 	point * data;
 	FILE *f;
 	FILE *c;
-	//char out[50];
+	char output[50];
+
 	int i,j;
 	for(i = 0; i < argc;i++){
 		if(!strcmp(argv[i],"-i")){
@@ -25,9 +26,9 @@ int main(int argc, char** argv){
 		if(!strcmp(argv[i], "-d")){
 			metric = atoi(argv[++i]);
 		}
-		/*if(!strcmp(argv[i], "-o")){
-			strcpy(out,argv[++i]);
-		}*/
+		if(!strcmp(argv[i], "-o")){
+			strcpy(output,argv[++i]);
+		}
 	}
 
 	// Parse data files
@@ -39,27 +40,30 @@ int main(int argc, char** argv){
 
 	//Create centroids
 	centroid * centroids;
-	int type = 1; //0 random, 1 kmeans++
-
-	centroids = init_centroids(k, data, no_of_samples, no_of_dimensions, type);
+	int type = 0; //0 random, 1 kmeans++
 	
-	/*
-	for(i = 0; i < k; i++){
-		printf("ID= %ld\n", centroids[i]->id);		
-		printf("COUNT= %d\n",centroids[i]->count);
-		print_coordinates_cent(centroids[i],  no_of_dimensions);
+	FILE * o;
+	o = fopen(output, "w");
+	while(type < 2){
+		int update = 0; //0 basic, 1 PAM
+		while(update < 2){
+			int assignment = 2;// 0 kmeans , 1 lsh, 2 hypercube
+			while(assignment <  3){
+				//Check Type
+				print_stuff1(o,type,update,assignment, metric);
+				
+				centroids = init_centroids(k, data, no_of_samples, no_of_dimensions, type);
+				/* Compute the distance of each point from a centroid
+				and assign each point to a centroid and each centroid to 
+				the points it has */
+
+				kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric,no_of_functions, L, update, o); 
+				//Evaluate centroids
+				shilouette_evaluation(o, centroids, data, no_of_samples, L, no_of_dimensions);
+				assignment ++;
+			}
+			update++;
+		}
+		type++;
 	}
-	*/
-
-	/* Compute the distance of each point from a centroid
-	and assign each point to a centroid and each centroid to 
-	the points it has */
-
-	type = 0; //0 normal, 1 PAM
-	int assignment = 1; //0 lloyds, 1 lsh, 2 hyperplane
-	kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric,no_of_functions, L, type); 
-	
-	//Evaluate centroids
-	//shilouette_evaluation(centroids, data, no_of_samples, no_of_dimensions);
-
 }

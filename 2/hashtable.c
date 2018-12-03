@@ -4,10 +4,10 @@ void hashtable_init(hashtable *ht, int size){
 	(*ht) = (struct hashtable *)malloc(sizeof(hashtable));
 	(*ht) -> size = size;
 	(*ht) -> cnt = 0;
-	(*ht) -> buckets = (struct bucket *)malloc(size * sizeof(struct bucket));
-	for(int i = 0; i < size; i++){
-		(*ht)->buckets[i].first=NULL;
-		//(*ht)->buckets[i].last=NULL;
+	(*ht) -> buckets = (bucket *)malloc(size * sizeof(bucket));
+	for(int i =0; i < size; i++){
+		(*ht) -> buckets[i] = (bucket)malloc(sizeof(struct bucket));
+		(*ht) -> buckets[i] -> first = NULL;
 	}
 }
 
@@ -15,16 +15,16 @@ int hashtable_size(hashtable ht){
 	return ht->cnt;
 }
 
-void bucket_insert(bucket b, point p){
-	if((b)->first == NULL){
-		(b)->first = p;
-		(b)->first->next = NULL;
-		(b)->last = (b)->first;
+void bucket_insert(bucket *b, point p){
+	if((*b)->first == NULL){
+		(*b)->first = p;
+		(*b)->first->next = NULL;
+		(*b)->last = p;
 	}
 	else{
-		(b)->last->next = p;
-		(b)->last = p;
-		(b)->last->next =  NULL;
+		(*b)->last->next = p;
+		(*b)->last = p;
+		(*b)->last->next =  NULL;
 	}
 }
 
@@ -33,7 +33,7 @@ void hashtable_print(hashtable ht){
 	for(i = 0; i< ht->size; i++){
 		printf("BUCKET NO: %d\n", i);
 		point tmp;
-		tmp = ht->buckets[i].first;
+		tmp = ht->buckets[i]->first;
 		while(tmp != NULL){
 			printf("%ld ", tmp->id);
 			tmp = tmp -> next;
@@ -47,7 +47,11 @@ void hashtable_insert(hashtable *ht, point p, long long int index){
 }
 
 void hashtable_free(hashtable *ht, int size){
-
+	for(int i = 0; i < size; i++){
+		free((*ht)->buckets[i]);
+		(*ht)->buckets[i]->first=NULL;
+		(*ht)->buckets[i]->last=NULL;
+	}
 	free((*ht)->buckets);
 	(*ht)->buckets = NULL;
 	(*ht)->size = 0;
@@ -59,7 +63,7 @@ void hashtable_free(hashtable *ht, int size){
 void bucket_print(hashtable ht, int index){
 	printf("BUCKET NO: %d\n", index);
 	point tmp;
-	tmp = ht->buckets[index].first;
+	tmp = ht->buckets[index]->first;
 	while(tmp != NULL){
 		printf("%ld ", tmp->id);
 		tmp = tmp -> next;
