@@ -47,7 +47,7 @@ int main(int argc, char** argv){
 	while(type < 2){
 		int update = 0; //0 basic, 1 PAM
 		while(update < 2){
-			int assignment = 2;// 0 kmeans , 1 lsh, 2 hypercube
+			int assignment = 0;// 0 kmeans , 1 lsh, 2 hypercube
 			while(assignment <  3){
 				//Check Type
 				print_stuff1(o,type,update,assignment, metric);
