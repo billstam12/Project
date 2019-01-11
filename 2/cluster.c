@@ -46,9 +46,9 @@ int main(int argc, char** argv){
 	o = fopen(output, "w");
 	while(type < 2){
 		int update = 0; //0 basic, 1 PAM
-		while(update < 2){
+		while(update < 1){
 			int assignment = 0;// 0 kmeans , 1 lsh, 2 hypercube
-			while(assignment <  3){
+			while(assignment <  1){
 				//Check Type
 				print_stuff1(o,type,update,assignment, metric);
 				
@@ -57,7 +57,7 @@ int main(int argc, char** argv){
 				and assign each point to a centroid and each centroid to 
 				the points it has */
 
-				kmeans(centroids,data,no_of_samples,no_of_dimensions,k, assignment, metric,no_of_functions, L, update, o); 
+				kmeans(centroids,data, no_of_samples, no_of_dimensions,k, assignment, metric,no_of_functions, L, update, o); 
 				//Evaluate centroids
 				shilouette_evaluation(o, centroids, data, no_of_samples, L, no_of_dimensions);
 				assignment ++;

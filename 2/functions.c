@@ -980,13 +980,13 @@ void kmeans(centroid* centroids,point* data, int no_of_samples, int no_of_dimens
 		//converged=-1;
 	}
 	for(i = 0; i < k; i++){
-		fprintf(o, "CLUSTER: %d SIZE: %d ",i, centroids[i]->count );
-		fprint_coordinates_cent(o, centroids[i], no_of_dimensions);
+		fprintf(o, "%d ", centroids[i]->count );
+		for(j = 0; j < centroids[i]->count; j++){
+				fprintf(o, "%ld\t",centroids[i]->assigned_points[j]->id);
+		}
+		//fprint_coordinates_cent(o, centroids[i], no_of_dimensions);
 		fprintf(o,"\n");
 	}
-	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	fprintf(o, "Clustering Time:%f\n", cpu_time_used);
 }
 
 int check_convergence(centroid * c1, centroid* c2, int no_of_dimensions, int k_prev, int k){
