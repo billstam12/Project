@@ -36,6 +36,7 @@ typedef struct cluster{
 
 typedef struct score_array{
 	double  value;
+	double old_value; //used for when need to re-initialize
 	int  id;
 } * score_array;
 
@@ -72,6 +73,8 @@ typedef struct users_and_tweets{
 	tweet * tweets;
 	int no_of_clusters;
 	cluster* clusters;
+	int no_of_coins;
+	char ** dict;
 } *users_and_tweets;
 
 /* HASHTABLE STUFF */

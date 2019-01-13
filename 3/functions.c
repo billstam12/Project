@@ -237,6 +237,10 @@ users_and_tweets  parse_data(FILE* f){
 		}
 	}
 
+	printf("Creating coins dictionary..\n");
+	char **dict = init_coin_dict();
+	printf("Creating coins dictionary, Done!\n");
+
 	// Here we will read the tweets from Project 2's dataset
 	FILE * f2;
 	f2 = fopen("dataset/twitter_dataset_small.csv", "r");
@@ -348,7 +352,7 @@ users_and_tweets  parse_data(FILE* f){
 		}
 	}
 	printf("Creating Users Database, Done!\n");
-	int no_of_clusters = 20;
+	int no_of_clusters = 50;
 	printf("Reading Clustering data from Project 2...\n");
 	cluster* clusters = parse_data_2(tweets, samps, no_of_clusters);
 	printf("Reading Clustering data from Project 2, Done!\n");
@@ -356,7 +360,7 @@ users_and_tweets  parse_data(FILE* f){
 	data->no_of_users = unique_users.count;
 	data->no_of_tweets = samps;
 	data->no_of_clusters = no_of_clusters;
-
+	data->no_of_coins = no_of_coins;
 	
 	rewind(f);
 	fclose(f);
@@ -374,6 +378,7 @@ users_and_tweets  parse_data(FILE* f){
 	data->users = users;
 	data->tweets = tweets;
 	data->clusters = clusters;
+	data->dict = dict;
 	return data;
 }
 
@@ -557,14 +562,19 @@ double** init(hashtable* ht, user *data , int no_samples, int no_dimensions, int
 
 }
 
-int** cosine_lsh_implementation(user* users, int no_of_users, int p, int type){
+int** cosine_lsh_implementation(user* users, int no_of_users, int p, int type, char ** dict, char* output){
 	//Initialize the hashtable variables
 	int L = 1;
 	int window = 30;
 	int no_of_dimensions = 100;
 	int no_of_functions = 4;
 	int i, j, z;
-
+	FILE * o = fopen(output, "a");
+	fprintf(o,"Cosine LSH\n");
+	fclose(o);
+	clock_t start, end;
+	double cpu_time_used;
+ 	start = clock();
 	double ** t; // t array
 	t = (double**)malloc(L*sizeof(double*));
 	int ** r; // r array
@@ -585,22 +595,34 @@ int** cosine_lsh_implementation(user* users, int no_of_users, int p, int type){
 		//hashtable_print(hts[i]);
 		//Query the table again to find neighbors
 		if(type == 0){
-			cosine_lsh_query(users, hts[i],  no_of_users , no_of_dimensions,  L,  p,  window,  no_of_functions,  table_size,  t,  r,  random_vectors[i], type);
+			cosine_lsh_query(users, hts[i],  no_of_users , no_of_dimensions,  L,  p,  window,  no_of_functions,  table_size,  t,  r,  random_vectors[i], type, dict, output);
 		}
 		else{
-			return cosine_lsh_query(users, hts[i],  no_of_users , no_of_dimensions,  L,  p,  window,  no_of_functions,  table_size,  t,  r,  random_vectors[i], type);
-
+			return cosine_lsh_query(users, hts[i],  no_of_users , no_of_dimensions,  L,  p,  window,  no_of_functions,  table_size,  t,  r,  random_vectors[i], type, dict, output);
 		}
 	}
+	for(i = 0; i < L; i++){
+		hashtable_free(&hts[i], table_size);
+		free(t[i]);
+		free(r[i]);
+		for(j = 0; j < no_of_functions; j++){
+			free(random_vectors[i][j]);
+		}
+		free(random_vectors[i]);
+	}
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	o = fopen(output, "a");
+	fprintf(o, "Time:%f\n", cpu_time_used);
+	fclose(o);
 
-	
 }
 
 
-int** cosine_lsh_query(user* data, hashtable ht, int no_of_users,  int no_of_dimensions, int L, int no_of_neighbors, int window, int no_of_functions, int table_size, double** t, int** r, double** random_vectors, int type){
+int** cosine_lsh_query(user* data, hashtable ht, int no_of_users,  int no_of_dimensions, int L, int no_of_neighbors, int window, int no_of_functions, int table_size, double** t, int** r, double** random_vectors, int type, char** dict, char* output){
 	int i, j, z;	
 	int ** coins = (int**)malloc(sizeof(int*)*no_of_users);
-
+	FILE * o = fopen(output, "a");
 	for ( i = 0; i < no_of_users; i++){
 		long long int index = cosine_hash(data[i], no_of_dimensions, no_of_functions, table_size,  random_vectors);			
 		user tmp=NULL;
@@ -660,10 +682,7 @@ int** cosine_lsh_query(user* data, hashtable ht, int no_of_users,  int no_of_dim
 		}
 		// Now from the new coins find the 5 best
 		qsort(data[i]->score_vector, 100, sizeof(data[i]->score_vector[0]), cmp);
-		for(k = 0; k < 5; k++){
-			//printf("%d ",data[i]->score_vector[k]->id);	
-			//Only thing left is to correspond the id to the name of the coin!		
-		}
+	
 		//printf("\n");
 		if(type == 1){
 			coins[i] = (int*)malloc(sizeof(int)*8);  //return more than 2, just in case we don't return stuff that the user has already seen
@@ -671,7 +690,15 @@ int** cosine_lsh_query(user* data, hashtable ht, int no_of_users,  int no_of_dim
 				coins[i][j] = data[i]->score_vector[j]->id;
 			}
 		}
+		else{
+			fprintf(o ,"<%d> ", data[i]->id);
+			for(k = 0; k < 5; k++){
+				fprintf(o, "%s ",dict[data[i]->score_vector[k]->id]);	
+			}
+			fprintf(o, "\n");
+		}
 	}
+	fclose(o);
 	return coins;
 }
 
@@ -715,11 +742,33 @@ void copy_user(user* p1, user p2, int no_of_dimensions){
 	(*p1)->centroid_id = p2->centroid_id;
 	(*p1)->centroid2_id = p2->centroid2_id;
 	(*p1)->score_vector = (score_array*)malloc(no_of_dimensions*sizeof(score_array));
+	(*p1)->no_of_tweets = p2->no_of_tweets;
+	(*p1)->tweets = (tweet*)malloc(sizeof(tweet)*(*p1)->no_of_tweets);
 	for(i = 0; i < no_of_dimensions; i++){
 		(*p1)->score_vector[i] = (score_array)malloc(sizeof(struct score_array));
 		(*p1)->score_vector[i]->value = p2->score_vector[i]->value;
 		(*p1)->score_vector[i]->id = p2->score_vector[i]->id;		
 	}
+	for(i = 0; i < (*p1)->no_of_tweets; i++){
+		(*p1)->tweets[i] = (p2)->tweets[i];
+	}
+}
+
+void cosine_cluster_implementation(user *users2, int no_of_users, int no_of_dimensions, int k, int p, int type, char** dict, char* output){
+	FILE* o = fopen(output, "a");
+	fprintf(o,"Cosine Cluster\n");
+	clock_t start, end;
+	double cpu_time_used;
+ 	start = clock();
+	centroid * centroids;
+	centroids = init_centroids(k, users2, no_of_users, no_of_dimensions, type);
+	kmeans(centroids, users2, no_of_users, no_of_dimensions, k, p );
+	k_means_recommend(centroids, users2, no_of_users, no_of_dimensions, k, p, 0, dict , output);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	fprintf(o, "Time:%f\n", cpu_time_used);
+	fclose(o);
+
 }
 
 centroid * init_centroids(int k, user* data, int no_of_samples, int no_of_dimensions, int type){
@@ -853,17 +902,16 @@ void kmeans(centroid* centroids, user* data, int no_of_samples, int no_of_dimens
 		//converged=-1;
 	}
 	for(i = 0; i < k; i++){
-		printf("CLUSTER: %d SIZE: %d ",i, centroids[i]->count );
-		print_coordinates_cent(centroids[i], no_of_dimensions);
+		//printf("CLUSTER: %d SIZE: %d ",i, centroids[i]->count );
+		//print_coordinates_cent(centroids[i], no_of_dimensions);
 	}
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("Clustering Time:%f\n", cpu_time_used);
+	//printf("Clustering Time:%f\n", cpu_time_used);
 	shilouette_evaluation(centroids, data, no_of_samples, no_of_dimensions, k);
 
 	/* Now we will recommend based on the clusters */
 
-	k_means_recommend(centroids, data, no_of_samples, no_of_dimensions, k, no_of_neighbors);
 }
 
 
@@ -990,12 +1038,14 @@ void shilouette_evaluation(centroid* centroids, user* data, int no_of_samples, i
 			centroids[i]->silhouette_of_cluster+=centroids[i]->assigned_users[j]->silhouette;
 		}
 		centroids[i]->silhouette_of_cluster /= centroids[i]->count;
-		printf("Shillouette of cluster %d is: %f\n",i, centroids[i]->silhouette_of_cluster);
 	}
 }
 
-void k_means_recommend(centroid* centroids, user* data, int no_of_samples, int no_of_dimensions, int k, int no_of_neighbors){
+int ** k_means_recommend(centroid* centroids, user* data, int no_of_samples, int no_of_dimensions, int k, int no_of_neighbors, int type, char** dict, char * output){
 	int i, j, z;
+	int ** coins = (int**)malloc(sizeof(int*)*no_of_samples);
+	FILE * o;
+	o = fopen(output, "a");
 	//2d array containing the base mean scores of each cluster
 	score_array** clusters_mean = (score_array**)malloc(sizeof(score_array*)*k);
 	for(i = 0; i < k; i++){
@@ -1028,22 +1078,50 @@ void k_means_recommend(centroid* centroids, user* data, int no_of_samples, int n
 			
 			// Now from the new coins find the 5 best
 			qsort(centroids[i]->assigned_users[j]->score_vector, 100, sizeof(centroids[i]->assigned_users[j]->score_vector), cmp);
-			for(z = 0; z < 5; z++){
-				//printf("%d ", centroids[i]->assigned_users[j]->score_vector[z]->id);	
-				//Only thing left is to correspond the id to the name of the coin!		
+			
+			//printf("\n");
+			if(type == 1){
+				coins[i] = (int*)malloc(sizeof(int)*8);  //return more than 2, just in case we don't return stuff that the user has already seen
+				int z;
+				for(z = 0; z < 8; z ++){
+					coins[i][z] = centroids[i]->assigned_users[j]->score_vector[z]->id;
+				}
 			}
-			printf("\n");
+			else{
+				fprintf(o ,"<%d> ", centroids[i]->assigned_users[j]->id);
+				int z;			
+				for(z = 0; z < 5; z++){
+					fprintf(o ,"%s ",dict[centroids[i]->assigned_users[j]->score_vector[z]->id]);	
+				}
+				fprintf(o ,"\n");
+			
+			}
 		}
 	}
+	//free centroids
+	for(i = 0; i < k; i ++){
+		for(j = 0; j < no_of_dimensions; j++){
+			free(centroids[i]->score_vector[j]);
+		}
+		free(centroids[i]);
+	}
+	free(centroids);
+	fclose(o);
+	return coins;
 }
 
 //QUESTION A ENDS HERE
 
 // QUESTION B STARTS HERE
 
-void clustering_lsh_implementation(user* users, cluster* clusters, int no_of_users, int no_of_clusters, int p){
+void clustering_lsh_implementation(user* users, cluster* clusters, int no_of_users, int no_of_clusters, int p, char** dict, char *output){
 	/* Create the c(j) vectors */
 	int i,j,z;
+	FILE *o = fopen(output, "a");
+	fprintf(o,"Clustering LSH\n");
+	clock_t start, end;
+	double cpu_time_used;
+ 	start = clock();
 	user * c = (user*)malloc(sizeof(user)*no_of_clusters);
 
 	for(i = 0; i < no_of_clusters; i++){
@@ -1063,9 +1141,11 @@ void clustering_lsh_implementation(user* users, cluster* clusters, int no_of_use
 
 		}
 	}
+
 	// C is a no_of_clusters rows and 100 columns long array
-	int** coins = cosine_lsh_implementation(c, no_of_clusters, p, 1); // Now we will have to correspond the return list with the users
+	int** coins = cosine_lsh_implementation(c, no_of_clusters, p, 1, dict, output); // Now we will have to correspond the return list with the users
 	for(i = 0; i < no_of_users;  i++){
+		fprintf(o ,"<%d> ", users[i]->id);
 		for(j = 0; j < no_of_clusters; j++){
 			int count = 0; //count till 2
 			for(z = 0; z < 8; z++){
@@ -1080,7 +1160,7 @@ void clustering_lsh_implementation(user* users, cluster* clusters, int no_of_use
 
 					}
 					if(flag == 0){
-						//printf("%d, %f ", coins[j][z], users[i]->score_vector[coins[j][z]]->value);
+						fprintf(o, "%s ", dict[coins[j][z]]);
 						count++;
 					}
 				}
@@ -1090,16 +1170,38 @@ void clustering_lsh_implementation(user* users, cluster* clusters, int no_of_use
 				break;
 			}
 		}
-		//printf("\n");
+		fprintf(o, "\n");
 	}
+
+	//free data
+	for(i = 0; i < no_of_clusters; i++){
+		free(coins[i]);
+	}
+	for(i = 0; i < no_of_clusters; i++){
+		for(j = 0; j < 100; j++){
+			free(c[i]->score_vector[j]);		
+		}
+		free(c[i]->score_vector);
+		free(c[i]);
+	}
+	free(c);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	fprintf(o, "Time:%f\n", cpu_time_used);
+	fclose(o);
+
 }
 
 
 
-void clustering_cluster_implementation(user* users, cluster* clusters, int no_of_users, int no_of_clusters, int p){
+void clustering_cluster_implementation(user* users, cluster* clusters, int no_of_users, int no_of_clusters, int p, char** dict, char *output){
 	int i,j,z;
 	user * c = (user*)malloc(sizeof(user)*no_of_clusters);
-
+	FILE *o = fopen(output, "a");
+	fprintf(o,"Clustering LSH\n");
+	clock_t start, end;
+	double cpu_time_used;
+ 	start = clock();
 	for(i = 0; i < no_of_clusters; i++){
 		c[i] = (user)malloc(sizeof(struct user)*100);
 		c[i]->score_vector = (score_array *)malloc(sizeof(score_array)*100);
@@ -1114,7 +1216,134 @@ void clustering_cluster_implementation(user* users, cluster* clusters, int no_of
 			for(z = 0; z < clusters[i]->size; z++){
 				c[i]->score_vector[j]->value += clusters[i]->tweets[z]->coordinates[j];
 			}
-
 		}
 	}
+
+	// Looyds basic assignment with basic update, and k-means++ initialization
+	int k = 5; 
+	centroid * centroids;
+	int type = 0;
+	centroids = init_centroids(k, c, no_of_clusters, 100, type);
+	kmeans(centroids, c, no_of_clusters, 100, k, p); 
+	int** coins = k_means_recommend(centroids, c,  no_of_clusters,  100,  k,  p, 1, dict, output);
+	for(i = 0; i < no_of_users;  i++){
+		fprintf(o ,"<%d> ", users[i]->id);
+		for(j = 0; j < no_of_clusters; j++){
+			int count = 0; //count till 2
+			for(z = 0; z < 8; z++){
+				if(count < 2){
+					int k;
+					int flag = 0;
+					for(k = 0; k < users[i]->no_of_tweets; k++){
+						if(users[i]->score_vector[coins[j][z]]->value != 0){ // filter here
+							flag = 1;
+							break;
+						}
+
+					}
+					if(flag == 0){
+						fprintf(o ,"%s ", dict[coins[j][z]]);
+						count++;
+					}
+				}
+				else break;
+			}
+			if(count >= 2){
+				break;
+			}
+		}
+		fprintf(o, "\n");
+	}
+	//free data
+	for(i = 0; i < no_of_clusters; i++){
+		free(coins[i]);
+	}
+	for(i = 0; i < no_of_clusters; i++){
+		for(j = 0; j < 100; j++){
+			free(c[i]->score_vector[j]);
+		}
+		free(c[i]->score_vector);
+		free(c[i]);
+	}
+	free(c);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	fprintf(o, "Time:%f\n", cpu_time_used);
+	fclose(o);
+}
+
+// Function for converting ids to coins
+
+char ** init_coin_dict(){
+	int i, j;
+	FILE * f = fopen("dataset/coin_clean_dict.txt", "r");
+	char * line = NULL;
+	size_t len = 0;
+	/* First count the number of lines of the document == number of tweets */
+	ssize_t read;
+	int samps = 0;
+	while((read = getline(&line, &len, f)) !=  -1){
+		samps ++;
+	}
+	rewind(f);
+	char ** dict = (char**)malloc(sizeof(char*)*samps);
+	i = 0;
+	while((read = getline(&line, &len, f)) !=  -1){
+		len = strlen(line);
+		if (len > 0 && line[len-1] == '\n')
+    		line[len-1] = 0;
+		dict[i] = (char*)malloc(sizeof(char)*strlen(line));
+		strcpy(dict[i], line);
+		i ++;
+	}
+	return dict;
+}
+
+void free_data(tweet * tweets, int no_of_samples, user* users, int no_of_users,  cluster* clusters, char ** dict, int no_of_coins){
+	int i,j;
+	for(i = 0; i < no_of_samples; i++){
+	    free_list(tweets[i]->coin_list);
+		for(j = 0; j < tweets[i]->no_of_words; j++){
+			free(tweets[i]->words[j]);
+		}
+		free(tweets[i]->words);
+		free(tweets[i]);
+	}
+	free(tweets);
+	for(i = 0; i < no_of_users; i++){
+		for(j = 0; j < users[i]->no_of_tweets; j++){
+			free(users[i]->score_vector[j]);
+		}
+		free(users[i]->score_vector);
+		free(users[i]);
+	}
+	free(users);
+	free(clusters);
+	for(i = 0; i < no_of_coins; i++){
+		free(dict[i]);
+	}
+	free(dict);
+}
+
+user * copy_users(user* users, int no_of_users){
+	int i;
+	user * users2;
+	users2 = (user*)malloc(sizeof(user)*no_of_users);
+	for(i = 0; i < no_of_users; i++){
+		users2[i] = (user)malloc(sizeof(struct user));
+		copy_user(&users2[i], users[i], 100);
+	}
+	return users2;
+}
+
+void free_users(user * users, int no_of_users){
+	int i,j;
+	for(i = 0; i < no_of_users; i++){
+		for(j = 0; j < users[i]->no_of_tweets; j++){
+			free(users[i]->score_vector[j]);
+		}
+		free(users[i]->score_vector);
+		free(users[i]);
+	}
+	free(users);
 }
